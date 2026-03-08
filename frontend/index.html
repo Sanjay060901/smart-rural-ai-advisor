@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌾</text></svg>" />
+    <!-- Preconnect to CartoDB CDN (fast Fastly-backed tiles) and geocoder -->
+    <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
+    <link rel="preconnect" href="https://b.basemaps.cartocdn.com" crossorigin />
+    <link rel="preconnect" href="https://c.basemaps.cartocdn.com" crossorigin />
+    <link rel="dns-prefetch" href="https://basemaps.cartocdn.com" />
+    <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin />
+    <!-- Google Fonts — loaded via <link> instead of CSS @import for parallel fetching -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Noto+Sans+Telugu:wght@400;600&family=Noto+Sans+Kannada:wght@400;600&family=Noto+Sans+Malayalam:wght@400;600&family=Noto+Sans+Bengali:wght@400;600&family=Noto+Sans+Gujarati:wght@400;600&family=Noto+Sans+Gurmukhi:wght@400;600&family=Noto+Sans+Oriya:wght@400;600&display=swap" />
+    <title>Smart Rural AI Advisor</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      (function () {
+        function hasExistingToggle(input) {
+          if (!input || !input.parentElement) return false;
+          return Boolean(input.parentElement.querySelector('.auth-visibility-btn'));
+        }
+
+        function ensureToggle(input) {
+          if (!input || input.dataset.eyeBound === '1') return;
+          if (hasExistingToggle(input)) {
+            input.dataset.eyeBound = '1';
+            return;
+          }
+
+          var parent = input.parentElement;
+          if (!parent) return;
+
+          var wrap = document.createElement('div');
+          wrap.className = 'auth-code-input-wrap auto-eye-wrap';
+          wrap.style.display = 'flex';
+          wrap.style.alignItems = 'center';
+          wrap.style.gap = '8px';
+
+          parent.insertBefore(wrap, input);
+          wrap.appendChild(input);
+
+          input.style.flex = '1';
+          input.style.minWidth = '0';
+
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'auth-visibility-btn auto-eye-btn';
+          btn.setAttribute('aria-label', 'Show PIN');
+          btn.title = 'Show PIN';
+          btn.textContent = '👁';
+
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            btn.textContent = show ? '🙈' : '👁';
+            btn.setAttribute('aria-label', show ? 'Hide PIN' : 'Show PIN');
+            btn.title = show ? 'Hide PIN' : 'Show PIN';
+          });
+
+          wrap.appendChild(btn);
+          input.dataset.eyeBound = '1';
+        }
+
+        function bindAllPasswordInputs() {
+          document.querySelectorAll('input[type="password"]').forEach(ensureToggle);
+        }
+
+        document.addEventListener('focusin', function (e) {
+          var target = e.target;
+          if (target && target.tagName === 'INPUT' && target.type === 'password') {
+            ensureToggle(target);
+          }
+        });
+
+        var observer = new MutationObserver(function () {
+          bindAllPasswordInputs();
+        });
+
+        function start() {
+          bindAllPasswordInputs();
+          observer.observe(document.body, { childList: true, subtree: true });
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', start);
+        } else {
+          start();
+        }
+      })();
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

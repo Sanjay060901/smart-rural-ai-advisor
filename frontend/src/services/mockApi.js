@@ -1,0 +1,424 @@
+// src/services/mockApi.js
+// Realistic mock responses for DEMO mode — supports all 13 Indian languages
+// Used when VITE_MOCK_AI=true so the UI works without a Bedrock backend
+
+// ── Language-aware response generator ────────────────────────────────────────
+
+const LANG_CODE = {
+    'en-IN': 'en', 'hi-IN': 'hi', 'ta-IN': 'ta', 'te-IN': 'te',
+    'kn-IN': 'kn', 'ml-IN': 'ml', 'bn-IN': 'bn', 'mr-IN': 'mr',
+    'gu-IN': 'gu', 'pa-IN': 'pa', 'or-IN': 'or', 'as-IN': 'as', 'ur-IN': 'ur',
+};
+
+// ── Detect language from text ────────────────────────────────────────────────
+
+const SCRIPT_RANGES = [
+    { lang: 'kn-IN', regex: /[\u0C80-\u0CFF]/ },         // Kannada
+    { lang: 'hi-IN', regex: /[\u0900-\u097F]/ },          // Devanagari (Hindi/Marathi)
+    { lang: 'ta-IN', regex: /[\u0B80-\u0BFF]/ },          // Tamil
+    { lang: 'te-IN', regex: /[\u0C00-\u0C7F]/ },          // Telugu
+    { lang: 'ml-IN', regex: /[\u0D00-\u0D7F]/ },          // Malayalam
+    { lang: 'bn-IN', regex: /[\u0980-\u09FF]/ },          // Bengali/Assamese
+    { lang: 'gu-IN', regex: /[\u0A80-\u0AFF]/ },          // Gujarati
+    { lang: 'pa-IN', regex: /[\u0A00-\u0A7F]/ },          // Gurmukhi (Punjabi)
+    { lang: 'or-IN', regex: /[\u0B00-\u0B7F]/ },          // Odia
+    { lang: 'ur-IN', regex: /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/ }, // Arabic/Urdu
+];
+
+function detectScriptLanguage(text) {
+    for (const { lang, regex } of SCRIPT_RANGES) {
+        if (regex.test(text)) return lang;
+    }
+    return null;
+}
+
+// Marathi vs Hindi disambiguation (both use Devanagari)
+const MARATHI_KEYWORDS = ['शेत', 'पीक', 'माती', 'शेतकरी', 'पाऊस', 'हवामान', 'योजना', 'सांगा', 'करा', 'आहे', 'कसे', 'कोणते'];
+
+function detectLanguageFromText(text, fallbackLang) {
+    const detected = detectScriptLanguage(text);
+    if (!detected) return fallbackLang || 'en-IN';
+
+    // Devanagari could be Hindi or Marathi
+    if (detected === 'hi-IN') {
+        const words = text.toLowerCase().split(/\s+/);
+        const marathiScore = words.filter(w => MARATHI_KEYWORDS.some(mk => w.includes(mk))).length;
+        if (marathiScore >= 2) return 'mr-IN';
+    }
+
+    // Bengali script could be Assamese
+    if (detected === 'bn-IN') {
+        if (/[ৰৱ]/.test(text)) return 'as-IN'; // Assamese-specific chars
+    }
+
+    return detected;
+}
+
+// ── Multilingual mock responses ──────────────────────────────────────────────
+
+const RESPONSES = {
+    'en-IN': {
+        price: `**Current Crop Market Prices (Mandi Rates):**\n\n📊 **Major Crops — Today's Prices:**\n\n| Crop | Min (₹/qtl) | Max (₹/qtl) | Modal (₹/qtl) |\n|------|-------------|-------------|----------------|\n| 🌾 Rice (Paddy) | ₹1,940 | ₹2,280 | ₹2,100 |\n| 🌽 Maize | ₹1,850 | ₹2,150 | ₹2,000 |\n| 🫘 Moong Dal | ₹6,800 | ₹7,500 | ₹7,200 |\n| 🌿 Cotton | ₹5,500 | ₹6,200 | ₹5,800 |\n| 🥜 Groundnut | ₹4,800 | ₹5,400 | ₹5,100 |\n| 🧅 Onion | ₹800 | ₹1,500 | ₹1,100 |\n| 🍅 Tomato | ₹600 | ₹1,200 | ₹900 |\n| 🥔 Potato | ₹500 | ₹900 | ₹700 |\n\n📈 **MSP (Minimum Support Price) 2025-26:**\n- Paddy: ₹2,300/qtl\n- Wheat: ₹2,275/qtl\n- Moong: ₹8,558/qtl\n- Cotton (medium): ₹7,121/qtl\n\n💡 **Tips for Better Price:**\n- Store in warehouse & sell when prices peak\n- Register on e-NAM (enam.gov.in) for transparent pricing\n- Check daily rates on Agmarknet (agmarknet.gov.in)\n\n📱 **Helpline:** Kisan Call Centre 1800-180-1551`,
+        weather: `**Current Weather & Farming Advisory:**\n\n🌡️ **Temperature:** 28°C (Feels like 31°C)\n💧 **Humidity:** 72%\n💨 **Wind:** 12 km/h NE\n🌧️ **Rainfall:** 0 mm today\n\n📅 **5-Day Forecast:**\n- Today: Clear sky, 25–32°C\n- Tomorrow: Partly cloudy, 24–31°C\n- Day 3: Light rain expected, 23–29°C\n- Day 4: Moderate rain, 22–28°C\n- Day 5: Clearing up, 24–30°C\n\n🌾 **Farming Advisory:**\n- Good conditions for field preparation and sowing\n- If rain is expected in 2-3 days, delay fertilizer application\n- Ensure proper drainage in low-lying fields\n- Ideal time for transplanting rice seedlings\n\n📱 **Tip:** Check the Weather page for live updates for your exact location!\n\n📞 **IMD Helpline:** 1800-180-1717`,
+        kharif: `**Kharif Season Crop Recommendations:**\n\n🌾 **Rice** — Best for areas with 150+ cm rainfall. Use SRI method for 30% higher yield.\n\n🌽 **Maize** — Good for drier regions. Hybrid varieties like DHM-117 give excellent results.\n\n🫘 **Pulses (Moong, Urad)** — Short duration (60-70 days). Great for crop rotation.\n\n🌿 **Cotton** — Suitable for black soil regions. Bt Cotton varieties are recommended.\n\n📅 **Sowing Window:** June 15 – July 15\n\n💡 **Tip:** Get your soil tested at the nearest KVK before sowing for best results.`,
+        pest: `**Integrated Pest Management for Rice:**\n\n🐛 **Common Pests:** Stem borer, Brown Plant Hopper (BPH), Leaf folder\n\n✅ **Biological Control:**\n- Release Trichogramma parasitoids (50,000/acre)\n- Encourage natural predators like spiders and dragonflies\n\n🧪 **Chemical Control (if severe):**\n- Stem borer: Cartap Hydrochloride 4G @ 8 kg/acre\n- BPH: Pymetrozine 50% WG @ 120g/acre\n\n🌱 **Cultural Practices:**\n- Maintain 2-3 cm water level\n- Use light traps (1 per acre)\n- Remove yellow/dead tillers\n\n⚠️ **Avoid:** Do not use broad-spectrum pesticides that kill beneficial insects.`,
+        scheme: `**PM-KISAN (Pradhan Mantri Kisan Samman Nidhi):**\n\n💰 **Benefit:** ₹6,000 per year in 3 equal installments of ₹2,000\n\n👤 **Eligibility:** All farmer families with cultivable land (subject to exclusions)\n\n📝 **How to Apply:**\n1. Visit pmkisan.gov.in\n2. Click "New Farmer Registration"\n3. Enter Aadhaar number and state\n4. Fill in bank details and land information\n\n📞 **Helpline:** 155261 or 011-24300606\n\n📅 **Payment Schedule:**\n- April-July: ₹2,000\n- August-November: ₹2,000\n- December-March: ₹2,000`,
+        irrigation: `**Smart Irrigation Methods for Your Farm:**\n\n💧 **Drip Irrigation:**\n- Saves 30-50% water\n- Best for: Vegetables, fruit trees, cotton\n- Govt subsidy: 55-80% under PMKSY\n\n🌊 **Sprinkler Irrigation:**\n- Saves 20-30% water\n- Best for: Wheat, groundnut, pulses\n- Ideal for sandy soils\n\n🏞️ **Raised Bed Planting:**\n- Saves 25-35% water\n- Best for: Wheat, maize, soybean\n- Also reduces lodging\n\n📱 **Smart Tip:** Install soil moisture sensors — water only when moisture drops below 50%.\n\n💰 **Subsidy:** Apply at your district agriculture office under PMKSY scheme.`,
+        default: `Thank you for your question! Here's what I recommend:\n\n🌾 For the best farming practices in your region, consider:\n\n1. **Soil Testing** — Get soil tested at your nearest KVK (free service)\n2. **Crop Selection** — Choose crops based on your soil type and local climate\n3. **Water Management** — Use drip/sprinkler irrigation for water savings\n4. **Organic Methods** — Use vermicompost and bio-fertilizers to reduce costs\n\n📞 **For personalized advice, call:** Kisan Call Centre at 1800-180-1551 (toll-free)\n\nWould you like to know more about any specific topic?`
+    },
+    'kn-IN': {
+        price: `**ಪ್ರಸ್ತುತ ಬೆಳೆ ಮಾರುಕಟ್ಟೆ ಬೆಲೆಗಳು (ಮಂಡಿ ದರಗಳು):**\n\n📊 **ಪ್ರಮುಖ ಬೆಳೆಗಳು — ಇಂದಿನ ಬೆಲೆಗಳು:**\n\n| ಬೆಳೆ | ಕನಿಷ್ಠ (₹/ಕ್ವಿಂ) | ಗರಿಷ್ಠ (₹/ಕ್ವಿಂ) | ಮಾದರಿ (₹/ಕ್ವಿಂ) |\n|------|------|------|------|\n| 🌾 ಭತ್ತ | ₹1,940 | ₹2,280 | ₹2,100 |\n| 🌽 ಮೆಕ್ಕೆಜೋಳ | ₹1,850 | ₹2,150 | ₹2,000 |\n| 🫘 ಹೆಸರುಬೇಳೆ | ₹6,800 | ₹7,500 | ₹7,200 |\n| 🌿 ಹತ್ತಿ | ₹5,500 | ₹6,200 | ₹5,800 |\n| 🥜 ಕಡಲೇಕಾಯಿ | ₹4,800 | ₹5,400 | ₹5,100 |\n| 🧅 ಈರುಳ್ಳಿ | ₹800 | ₹1,500 | ₹1,100 |\n| 🍅 ಟೊಮೇಟೊ | ₹600 | ₹1,200 | ₹900 |\n\n📈 **MSP 2025-26:**\n- ಭತ್ತ: ₹2,300/ಕ್ವಿಂ\n- ಗೋಧಿ: ₹2,275/ಕ್ವಿಂ\n- ಹೆಸರು: ₹8,558/ಕ್ವಿಂ\n\n💡 **ಉತ್ತಮ ಬೆಲೆ ಪಡೆಯಲು:**\n- ಗೋದಾಮಿನಲ್ಲಿ ಶೇಖರಿಸಿ ಬೆಲೆ ಏರಿದಾಗ ಮಾರಿ\n- e-NAM (enam.gov.in) ನಲ್ಲಿ ನೋಂದಣಿ ಮಾಡಿ\n\n📱 **ಸಹಾಯವಾಣಿ:** ಕಿಸಾನ್ ಕಾಲ್ ಸೆಂಟರ್ 1800-180-1551`,
+        weather: `**ಪ್ರಸ್ತುತ ಹವಾಮಾನ ಮತ್ತು ಕೃಷಿ ಸಲಹೆ:**\n\n🌡️ **ತಾಪಮಾನ:** 28°C (ಅನುಭವ 31°C)\n💧 **ಆರ್ದ್ರತೆ:** 72%\n💨 **ಗಾಳಿ:** 12 ಕಿಮೀ/ಗಂ ಈಶಾನ್ಯ\n🌧️ **ಮಳೆ:** ಇಂದು 0 ಮಿಮೀ\n\n📅 **5 ದಿನಗಳ ಮುನ್ಸೂಚನೆ:**\n- ಇಂದು: ನಿರ್ಮಲ ಆಕಾಶ, 25–32°C\n- ನಾಳೆ: ಭಾಗಶಃ ಮೋಡ, 24–31°C\n- 3ನೇ ದಿನ: ಹಗುರ ಮಳೆ ನಿರೀಕ್ಷೆ, 23–29°C\n\n🌾 **ಕೃಷಿ ಸಲಹೆ:**\n- ಹೊಲ ತಯಾರಿ ಮತ್ತು ಬಿತ್ತನೆಗೆ ಒಳ್ಳೆಯ ಪರಿಸ್ಥಿತಿ\n- 2-3 ದಿನಗಳಲ್ಲಿ ಮಳೆ ನಿರೀಕ್ಷಿಸಿದರೆ, ಗೊಬ್ಬರ ಹಾಕುವುದನ್ನು ಮುಂದೂಡಿ\n\n📞 **IMD ಸಹಾಯವಾಣಿ:** 1800-180-1717`,
+        kharif: `**ಖಾರಿಫ್ ಋತುವಿನ ಬೆಳೆ ಶಿಫಾರಸುಗಳು:**\n\n🌾 **ಭತ್ತ** — 150+ ಸೆಂ.ಮೀ ಮಳೆ ಇರುವ ಪ್ರದೇಶಗಳಿಗೆ ಉತ್ತಮ. SRI ವಿಧಾನವನ್ನು ಬಳಸಿ 30% ಹೆಚ್ಚು ಇಳುವರಿ ಪಡೆಯಿರಿ.\n\n🌽 **ಮೆಕ್ಕೆಜೋಳ** — ಒಣ ಪ್ರದೇಶಗಳಿಗೆ ಒಳ್ಳೆಯದು. DHM-117 ನಂತಹ ಹೈಬ್ರಿಡ್ ತಳಿಗಳು ಅತ್ಯುತ್ತಮ ಫಲಿತಾಂಶ ನೀಡುತ್ತವೆ.\n\n🫘 **ಬೇಳೆಕಾಳುಗಳು (ಹೆಸರು, ಉದ್ದು)** — ಕಡಿಮೆ ಅವಧಿ (60-70 ದಿನ). ಬೆಳೆ ಸರದಿಗೆ ಉತ್ತಮ.\n\n🌿 **ಹತ್ತಿ** — ಕಪ್ಪು ಮಣ್ಣಿನ ಪ್ರದೇಶಗಳಿಗೆ ಸೂಕ್ತ. Bt ಹತ್ತಿ ತಳಿಗಳನ್ನು ಶಿಫಾರಸು ಮಾಡಲಾಗಿದೆ.\n\n📅 **ಬಿತ್ತನೆ ಸಮಯ:** ಜೂನ್ 15 – ಜುಲೈ 15\n\n💡 **ಸಲಹೆ:** ಉತ್ತಮ ಫಲಿತಾಂಶಗಳಿಗಾಗಿ ಬಿತ್ತನೆ ಮುನ್ನ ಹತ್ತಿರದ KVK ನಲ್ಲಿ ಮಣ್ಣು ಪರೀಕ್ಷೆ ಮಾಡಿಸಿ.`,
+        pest: `**ಭತ್ತದಲ್ಲಿ ಸಮಗ್ರ ಕೀಟ ನಿರ್ವಹಣೆ:**\n\n🐛 **ಸಾಮಾನ್ಯ ಕೀಟಗಳು:** ಕಾಂಡ ಕೊರಕ, ಕಂದು ಗಿಡಹೇನು (BPH), ಎಲೆ ಸುರುಳಿ\n\n✅ **ಜೈವಿಕ ನಿಯಂತ್ರಣ:**\n- ಟ್ರೈಕೊಗ್ರಾಮಾ ಪರಾವಲಂಬಿಗಳನ್ನು ಬಿಡುಗಡೆ ಮಾಡಿ (ಎಕರೆಗೆ 50,000)\n- ಜೇಡ ಮತ್ತು ಟ್ಯಾಟೆಹುಳುಗಳಂತಹ ನೈಸರ್ಗಿಕ ಪರಭಕ್ಷಕಗಳನ್ನು ಪ್ರೋತ್ಸಾಹಿಸಿ\n\n🧪 **ರಾಸಾಯನಿಕ ನಿಯಂತ್ರಣ (ತೀವ್ರವಾದರೆ):**\n- ಕಾಂಡ ಕೊರಕ: ಕಾರ್ಟಾಪ್ ಹೈಡ್ರೋಕ್ಲೋರೈಡ್ 4G @ ಎಕರೆಗೆ 8 ಕೆ.ಜಿ\n- BPH: ಪೈಮೆಟ್ರೋಜಿನ್ 50% WG @ ಎಕರೆಗೆ 120ಗ್ರಾಂ\n\n🌱 **ಸಾಂಸ್ಕೃತಿಕ ಪದ್ಧತಿಗಳು:**\n- 2-3 ಸೆಂ.ಮೀ ನೀರಿನ ಮಟ್ಟ ಕಾಪಾಡಿ\n- ಬೆಳಕಿನ ಬಲೆ ಬಳಸಿ (ಎಕರೆಗೆ 1)\n\n⚠️ **ತಪ್ಪಿಸಿ:** ಉಪಯುಕ್ತ ಕೀಟಗಳನ್ನು ಕೊಲ್ಲುವ ವಿಶಾಲ-ವ್ಯಾಪ್ತಿ ಕೀಟನಾಶಕಗಳನ್ನು ಬಳಸಬೇಡಿ.`,
+        scheme: `**ಪಿಎಂ-ಕಿಸಾನ್ (ಪ್ರಧಾನ ಮಂತ್ರಿ ಕಿಸಾನ್ ಸಮ್ಮಾನ್ ನಿಧಿ):**\n\n💰 **ಪ್ರಯೋಜನ:** ವಾರ್ಷಿಕ ₹6,000 — ₹2,000 ರ 3 ಸಮಾನ ಕಂತುಗಳಲ್ಲಿ\n\n👤 **ಅರ್ಹತೆ:** ಕೃಷಿ ಭೂಮಿ ಹೊಂದಿರುವ ಎಲ್ಲಾ ರೈತ ಕುಟುಂಬಗಳು\n\n📝 **ಅರ್ಜಿ ಹೇಗೆ ಸಲ್ಲಿಸುವುದು:**\n1. pmkisan.gov.in ಗೆ ಭೇಟಿ ನೀಡಿ\n2. "ಹೊಸ ರೈತ ನೋಂದಣಿ" ಕ್ಲಿಕ್ ಮಾಡಿ\n3. ಆಧಾರ್ ಸಂಖ್ಯೆ ಮತ್ತು ರಾಜ್ಯ ನಮೂದಿಸಿ\n4. ಬ್ಯಾಂಕ್ ವಿವರ ಮತ್ತು ಭೂಮಿ ಮಾಹಿತಿ ಭರ್ತಿಮಾಡಿ\n\n📞 **ಸಹಾಯವಾಣಿ:** 155261 ಅಥವಾ 011-24300606`,
+        irrigation: `**ನಿಮ್ಮ ಹೊಲಕ್ಕೆ ಬುದ್ಧಿವಂತ ನೀರಾವರಿ ವಿಧಾನಗಳು:**\n\n💧 **ಹನಿ ನೀರಾವರಿ:**\n- 30-50% ನೀರು ಉಳಿಸುತ್ತದೆ\n- ಉತ್ತಮ: ತರಕಾರಿಗಳು, ಹಣ್ಣಿನ ಮರಗಳು, ಹತ್ತಿ\n- ಸರ್ಕಾರಿ ಸಬ್ಸಿಡಿ: PMKSY ಅಡಿ 55-80%\n\n🌊 **ತುಂತುರು ನೀರಾವರಿ:**\n- 20-30% ನೀರು ಉಳಿಸುತ್ತದೆ\n- ಉತ್ತಮ: ಗೋಧಿ, ಶೇಂಗಾ, ಬೇಳೆಕಾಳು\n\n📱 **ಸಲಹೆ:** ಮಣ್ಣಿನ ತೇವಾಂಶ ಸಂವೇದಕಗಳನ್ನು ಅಳವಡಿಸಿ — ತೇವಾಂಶ 50% ಕ್ಕಿಂತ ಕಡಿಮೆಯಾದಾಗ ಮಾತ್ರ ನೀರು ಹಾಕಿ.\n\n💰 **ಸಬ್ಸಿಡಿ:** PMKSY ಯೋಜನೆ ಅಡಿ ನಿಮ್ಮ ಜಿಲ್ಲಾ ಕೃಷಿ ಕಚೇರಿಯಲ್ಲಿ ಅರ್ಜಿ ಸಲ್ಲಿಸಿ.`,
+        default: `ನಿಮ್ಮ ಪ್ರಶ್ನೆಗೆ ಧನ್ಯವಾದಗಳು! ಇಲ್ಲಿ ನನ್ನ ಶಿಫಾರಸುಗಳಿವೆ:\n\n🌾 ನಿಮ್ಮ ಪ್ರದೇಶದಲ್ಲಿ ಉತ್ತಮ ಕೃಷಿ ಪದ್ಧತಿಗಳಿಗಾಗಿ:\n\n1. **ಮಣ್ಣು ಪರೀಕ್ಷೆ** — ಹತ್ತಿರದ KVK ನಲ್ಲಿ ಮಣ್ಣು ಪರೀಕ್ಷೆ ಮಾಡಿಸಿ (ಉಚಿತ ಸೇವೆ)\n2. **ಬೆಳೆ ಆಯ್ಕೆ** — ಮಣ್ಣಿನ ಪ್ರಕಾರ ಮತ್ತು ಸ್ಥಳೀಯ ಹವಾಮಾನದ ಆಧಾರದಲ್ಲಿ ಬೆಳೆ ಆಯ್ಕೆ ಮಾಡಿ\n3. **ನೀರು ನಿರ್ವಹಣೆ** — ನೀರು ಉಳಿಸಲು ಹನಿ/ತುಂತುರು ನೀರಾವರಿ ಬಳಸಿ\n4. **ಸಾವಯವ ವಿಧಾನಗಳು** — ವೆಚ್ಚ ಕಡಿಮೆ ಮಾಡಲು ಎರೆಹುಳು ಗೊಬ್ಬರ ಮತ್ತು ಜೈವಿಕ ಗೊಬ್ಬರ ಬಳಸಿ\n\n📞 **ವೈಯಕ್ತಿಕ ಸಲಹೆಗಾಗಿ ಕರೆ ಮಾಡಿ:** ಕಿಸಾನ್ ಕಾಲ್ ಸೆಂಟರ್ 1800-180-1551 (ಉಚಿತ)\n\nಯಾವುದೇ ನಿರ್ದಿಷ್ಟ ವಿಷಯದ ಬಗ್ಗೆ ಇನ್ನಷ್ಟು ತಿಳಿಯಲು ಬಯಸುವಿರಾ?`
+    },
+    'hi-IN': {
+        price: `**वर्तमान फसल बाजार भाव (मंडी दर):**\n\n📊 **प्रमुख फसलें — आज के भाव:**\n\n| फसल | न्यूनतम (₹/क्विंटल) | अधिकतम (₹/क्विंटल) | मॉडल (₹/क्विंटल) |\n|------|------|------|------|\n| 🌾 धान | ₹1,940 | ₹2,280 | ₹2,100 |\n| 🌽 मक्का | ₹1,850 | ₹2,150 | ₹2,000 |\n| 🫘 मूंग दाल | ₹6,800 | ₹7,500 | ₹7,200 |\n| 🌿 कपास | ₹5,500 | ₹6,200 | ₹5,800 |\n| 🥜 मूंगफली | ₹4,800 | ₹5,400 | ₹5,100 |\n| 🧅 प्याज | ₹800 | ₹1,500 | ₹1,100 |\n| 🍅 टमाटर | ₹600 | ₹1,200 | ₹900 |\n\n📈 **MSP (न्यूनतम समर्थन मूल्य) 2025-26:**\n- धान: ₹2,300/क्विंटल\n- गेहूं: ₹2,275/क्विंटल\n- मूंग: ₹8,558/क्विंटल\n- कपास: ₹7,121/क्विंटल\n\n💡 **बेहतर दाम पाने के उपाय:**\n- गोदाम में भंडारण करें और दाम बढ़ने पर बेचें\n- e-NAM (enam.gov.in) पर पंजीकरण करें\n- दैनिक भाव Agmarknet (agmarknet.gov.in) पर देखें\n\n📱 **हेल्पलाइन:** किसान कॉल सेंटर 1800-180-1551`,
+        weather: `**वर्तमान मौसम और कृषि सलाह:**\n\n🌡️ **तापमान:** 28°C (महसूस 31°C)\n💧 **आर्द्रता:** 72%\n💨 **हवा:** 12 किमी/घंटा पूर्वोत्तर\n🌧️ **वर्षा:** आज 0 मिमी\n\n📅 **5 दिन का पूर्वानुमान:**\n- आज: साफ आसमान, 25–32°C\n- कल: आंशिक बादल, 24–31°C\n- तीसरा दिन: हल्की बारिश की संभावना, 23–29°C\n- चौथा दिन: मध्यम बारिश, 22–28°C\n- पांचवां दिन: मौसम साफ, 24–30°C\n\n🌾 **कृषि सलाह:**\n- खेत की तैयारी और बुवाई के लिए अच्छी स्थिति\n- यदि 2-3 दिनों में बारिश अपेक्षित है, तो उर्वरक देने में देरी करें\n- निचले इलाकों में उचित जल निकासी सुनिश्चित करें\n\n📞 **IMD हेल्पलाइन:** 1800-180-1717`,
+        kharif: `**खरीफ सीजन फसल सिफारिशें:**\n\n🌾 **धान** — 150+ सेमी वर्षा वाले क्षेत्रों के लिए सर्वोत्तम। SRI विधि से 30% अधिक उपज प्राप्त करें।\n\n🌽 **मक्का** — सूखे क्षेत्रों के लिए अच्छा। DHM-117 जैसी हाइब्रिड किस्में उत्कृष्ट परिणाम देती हैं।\n\n🫘 **दालें (मूंग, उड़द)** — कम अवधि (60-70 दिन)। फसल चक्र के लिए उत्तम।\n\n📅 **बुवाई का समय:** 15 जून – 15 जुलाई\n\n💡 **सुझाव:** बुवाई से पहले नजदीकी KVK में मिट्टी की जांच कराएं।`,
+        pest: `**धान में समेकित कीट प्रबंधन:**\n\n🐛 **प्रमुख कीट:** तना छेदक, भूरा पौध माहू (BPH), पत्ती लपेटक\n\n✅ **जैविक नियंत्रण:**\n- ट्राइकोग्रामा परजीवी छोड़ें (50,000/एकड़)\n- मकड़ी और व्याध पतंगे जैसे प्राकृतिक शत्रुओं को बढ़ावा दें\n\n🧪 **रासायनिक नियंत्रण (गंभीर होने पर):**\n- तना छेदक: कार्टाप हाइड्रोक्लोराइड 4G @ 8 किग्रा/एकड़\n- BPH: पाइमेट्रोजिन 50% WG @ 120ग्रा/एकड़\n\n⚠️ **सावधानी:** लाभदायक कीटों को मारने वाले व्यापक कीटनाशकों का उपयोग न करें।`,
+        scheme: `**पीएम-किसान (प्रधानमंत्री किसान सम्मान निधि):**\n\n💰 **लाभ:** ₹6,000 प्रति वर्ष — ₹2,000 की 3 समान किस्तों में\n\n👤 **पात्रता:** खेती योग्य भूमि वाले सभी किसान परिवार\n\n📝 **आवेदन कैसे करें:**\n1. pmkisan.gov.in पर जाएं\n2. "नया किसान पंजीकरण" पर क्लिक करें\n3. आधार नंबर और राज्य दर्ज करें\n4. बैंक विवरण और भूमि जानकारी भरें\n\n📞 **हेल्पलाइन:** 155261 या 011-24300606`,
+        default: `आपके प्रश्न के लिए धन्यवाद! यहाँ मेरी सिफारिशें हैं:\n\n🌾 अपने क्षेत्र में सर्वोत्तम कृषि पद्धतियों के लिए:\n\n1. **मिट्टी परीक्षण** — नजदीकी KVK में मिट्टी की जांच कराएं (मुफ्त सेवा)\n2. **फसल चयन** — मिट्टी के प्रकार और स्थानीय जलवायु के आधार पर फसल चुनें\n3. **जल प्रबंधन** — पानी बचाने के लिए ड्रिप/स्प्रिंकलर सिंचाई का उपयोग करें\n\n📞 **व्यक्तिगत सलाह के लिए कॉल करें:** किसान कॉल सेंटर 1800-180-1551 (टोल-फ्री)`
+    },
+    'ta-IN': {
+        price: `**தற்போதைய பயிர் சந்தை விலைகள் (மண்டி விலைகள்):**\n\n📊 **முக்கிய பயிர்கள் — இன்றைய விலைகள்:**\n\n| பயிர் | குறைந்தபட்சம் (₹/குவி) | அதிகபட்சம் (₹/குவி) | நடுநிலை (₹/குவி) |\n|-------|----------------------|---------------------|------------------|\n| 🌾 நெல் | ₹1,940 | ₹2,280 | ₹2,100 |\n| 🌽 மக்காச்சோளம் | ₹1,850 | ₹2,150 | ₹2,000 |\n| 🫘 பாசிப்பருப்பு | ₹6,800 | ₹7,500 | ₹7,200 |\n| 🥜 நிலக்கடலை | ₹4,800 | ₹5,400 | ₹5,100 |\n| 🧅 வெங்காயம் | ₹800 | ₹1,500 | ₹1,100 |\n| 🍅 தக்காளி | ₹600 | ₹1,200 | ₹900 |\n| 🥔 உருளைக்கிழங்கு | ₹500 | ₹900 | ₹700 |\n\n📈 **MSP (குறைந்தபட்ச ஆதரவு விலை) 2025-26:**\n- நெல்: ₹2,300/குவி\n- கோதுமை: ₹2,275/குவி\n- பாசிப்பருப்பு: ₹8,558/குவி\n\n💡 **சிறந்த விலை பெற:**\n- கிடங்கில் சேமித்து விலை உயரும்போது விற்கவும்\n- e-NAM (enam.gov.in) இல் பதிவு செய்யுங்கள்\n- தினசரி விலைகளை Agmarknet (agmarknet.gov.in) இல் பாருங்கள்\n\n📱 **ஹெல்ப்லைன்:** கிசான் கால் சென்டர் 1800-180-1551`,
+        weather: `**தற்போதைய வானிலை & விவசாய ஆலோசனை:**\n\n🌡️ **வெப்பநிலை:** 28°C (உணர்வு 31°C)\n💧 **ஈரப்பதம்:** 72%\n💨 **காற்று:** 12 கி.மீ/மணி வடகிழக்கு\n🌧️ **மழைப்பொழிவு:** இன்று 0 மி.மீ\n\n📅 **5 நாள் முன்னறிவிப்பு:**\n- இன்று: தெளிவான வானம், 25–32°C\n- நாளை: பகுதி மேகமூட்டம், 24–31°C\n- 3ம் நாள்: லேசான மழை எதிர்பார்க்கப்படுகிறது, 23–29°C\n- 4ம் நாள்: மிதமான மழை, 22–28°C\n- 5ம் நாள்: தெளிவாகும், 24–30°C\n\n🌾 **விவசாய ஆலோசனை:**\n- நிலம் தயாரிப்பு மற்றும் விதைப்புக்கு நல்ல நிலைமைகள்\n- 2-3 நாட்களில் மழை எதிர்பார்க்கப்பட்டால், உர பயன்பாட்டை தாமதப்படுத்துங்கள்\n- பள்ளமான நிலங்களில் சரியான வடிகால் உறுதி செய்யுங்கள்\n- நெல் நாற்று நடவுக்கு ஏற்ற நேரம்\n\n📱 **குறிப்பு:** உங்கள் இடத்திற்கான நேரடி புதுப்பிப்புகளுக்கு வானிலை பக்கத்தைப் பாருங்கள்!\n\n📞 **IMD ஹெல்ப்லைன்:** 1800-180-1717`,
+        kharif: `**காரிஃப் பருவ பயிர் பரிந்துரைகள்:**\n\n🌾 **நெல்** — 150+ செ.மீ மழைப்பொழிவு உள்ள பகுதிகளுக்கு சிறந்தது. SRI முறையில் 30% அதிக மகசூல் பெறலாம்.\n\n🌽 **மக்காச்சோளம்** — வறண்ட பகுதிகளுக்கு நல்லது. DHM-117 போன்ற கலப்பின வகைகள் சிறந்த பலன் தரும்.\n\n🫘 **பயறு வகைகள் (பச்சைப்பயறு, உளுந்து)** — குறுகிய காலம் (60-70 நாட்கள்). பயிர் சுழற்சிக்கு ஏற்றது.\n\n📅 **விதைப்பு நேரம்:** ஜூன் 15 – ஜூலை 15\n\n💡 **குறிப்பு:** விதைப்பதற்கு முன் அருகிலுள்ள KVK-யில் மண் பரிசோதனை செய்யுங்கள்.`,
+        pest: `**நெல்லில் ஒருங்கிணைந்த பூச்சி மேலாண்மை:**\n\n🐛 **முக்கிய பூச்சிகள்:** தண்டு துளைப்பான், பழுப்பு தாவர பேன் (BPH), இலை மடக்கி\n\n✅ **உயிரியல் கட்டுப்பாடு:**\n- டிரைக்கோகிராமா ஒட்டுண்ணிகளை விடுங்கள் (ஏக்கருக்கு 50,000)\n- சிலந்திகள் மற்றும் தட்டான்போன்ற இயற்கை எதிரிகளை ஊக்குவியுங்கள்\n\n🧪 **ரசாயன கட்டுப்பாடு (தீவிரமானால்):**\n- தண்டு துளைப்பான்: கார்டாப் ஹைட்ரோகுளோரைடு 4G @ ஏக்கருக்கு 8 கிலோ\n\n⚠️ **தவிர்க்கவும்:** பயனுள்ள பூச்சிகளைக் கொல்லும் பரந்த-நிற பூச்சிக்கொல்லிகளை பயன்படுத்தாதீர்கள்.`,
+        scheme: `**பிஎம்-கிசான் (பிரதமர் விவசாயி சம்மான் நிதி):**\n\n💰 **பயன்:** ₹6,000 ஆண்டுக்கு — ₹2,000 வீதம் 3 சம தவணைகளில்\n\n👤 **தகுதி:** விவசாய நிலம் உள்ள அனைத்து விவசாயி குடும்பங்கள்\n\n📝 **விண்ணப்பிப்பது எப்படி:**\n1. pmkisan.gov.in சென்று\n2. "புதிய விவசாயி பதிவு" கிளிக் செய்யுங்கள்\n3. ஆதார் எண் மற்றும் மாநிலம் உள்ளிடுங்கள்\n\n📞 **ஹெல்ப்லைன்:** 155261 அல்லது 011-24300606`,
+        default: `உங்கள் கேள்விக்கு நன்றி! இதோ என் பரிந்துரைகள்:\n\n🌾 சிறந்த விவசாய முறைகளுக்கு:\n\n1. **மண் பரிசோதனை** — அருகிலுள்ள KVK-யில் மண் பரிசோதனை செய்யுங்கள் (இலவச சேவை)\n2. **பயிர் தேர்வு** — மண் வகை மற்றும் உள்ளூர் தட்பவெப்பநிலையின் அடிப்படையில் பயிர் தேர்வு செய்யுங்கள்\n3. **நீர் மேலாண்மை** — நீர் சேமிக்க சொட்டு/தெளிப்பு நீர்ப்பாசனம் பயன்படுத்துங்கள்\n\n📞 **தனிப்பட்ட ஆலோசனைக்கு:** கிசான் கால் சென்டர் 1800-180-1551 (கட்டணமில்லா)`
+    },
+    'te-IN': {
+        price: `**ప్రస్తుత పంట మార్కెట్ ధరలు (మండి ధరలు):**\n\n📊 **ప్రధాన పంటలు — ఈరోజు ధరలు:**\n\n| పంట | కనిష్ట (₹/క్వింటాల్) | గరిష్ట (₹/క్వింటాల్) | మోడల్ (₹/క్వింటాల్) |\n|------|------|------|------|\n| 🌾 వరి | ₹1,940 | ₹2,280 | ₹2,100 |\n| 🌽 మొక్కజొన్న | ₹1,850 | ₹2,150 | ₹2,000 |\n| 🫘 పెసరపప్పు | ₹6,800 | ₹7,500 | ₹7,200 |\n| 🌿 పత్తి | ₹5,500 | ₹6,200 | ₹5,800 |\n| 🥜 వేరుశెనగ | ₹4,800 | ₹5,400 | ₹5,100 |\n| 🧅 ఉల్లిపాయ | ₹800 | ₹1,500 | ₹1,100 |\n| 🍅 టమాటా | ₹600 | ₹1,200 | ₹900 |\n\n📈 **MSP 2025-26:**\n- వరి: ₹2,300/క్వింటాల్\n- గోధుమ: ₹2,275/క్వింటాల్\n\n💡 **మెరుగైన ధర కోసం:**\n- గోడౌన్‌లో నిల్వ చేసి ధర పెరిగినప్పుడు అమ్మండి\n- e-NAM (enam.gov.in) లో రిజిస్టర్ చేయండి\n\n📱 **హెల్ప్‌లైన్:** కిసాన్ కాల్ సెంటర్ 1800-180-1551`,
+        weather: `**ప్రస్తుత వాతావరణం & వ్యవసాయ సలహా:**\n\n🌡️ **ఉష్ణోగ్రత:** 28°C (అనుభవం 31°C)\n💧 **తేమ:** 72%\n💨 **గాలి:** 12 కి.మీ/గం ఈశాన్యం\n🌧️ **వర్షపాతం:** ఈరోజు 0 మి.మీ\n\n📅 **5 రోజుల అంచనా:**\n- ఈరోజు: నిర్మలమైన ఆకాశం, 25–32°C\n- రేపు: పాక్షిక మేఘావృతం, 24–31°C\n- 3వ రోజు: తేలిక వర్షం ఆశించవచ్చు, 23–29°C\n\n🌾 **వ్యవసాయ సలహా:**\n- పొలం సిద్ధం చేయడానికి మరియు విత్తడానికి మంచి పరిస్థితులు\n- 2-3 రోజుల్లో వర్షం ఆశించినట్లయితే, ఎరువుల వాడకం ఆలస్యం చేయండి\n\n📞 **IMD హెల్ప్‌లైన్:** 1800-180-1717`,
+        kharif: `**ఖరీఫ్ సీజన్ పంట సిఫార్సులు:**\n\n🌾 **వరి** — 150+ సెం.మీ వర్షపాతం ఉన్న ప్రాంతాలకు ఉత్తమం. SRI పద్ధతి ద్వారా 30% ఎక్కువ దిగుబడి పొందండి.\n\n🌽 **మొక్కజొన్న** — పొడి ప్రాంతాలకు మంచిది. DHM-117 వంటి హైబ్రిడ్ రకాలు అద్భుతమైన ఫలితాలు ఇస్తాయి.\n\n📅 **విత్తనం వేయు సమయం:** జూన్ 15 – జులై 15\n\n💡 **సూచన:** విత్తనం వేయడానికి ముందు సమీపంలోని KVK లో నేల పరీక్ష చేయించండి.`,
+        default: `మీ ప్రశ్నకు ధన్యవాదాలు! ఇక్కడ నా సిఫార్సులు ఉన్నాయి:\n\n🌾 ఉత్తమ వ్యవసాయ పద్ధతుల కోసం:\n\n1. **నేల పరీక్ష** — సమీపంలోని KVK లో నేల పరీక్ష చేయించండి (ఉచిత సేవ)\n2. **పంట ఎంపిక** — నేల రకం మరియు స్థానిక వాతావరణం ఆధారంగా పంట ఎంచుకోండి\n3. **నీటి నిర్వహణ** — నీటిని ఆదా చేయడానికి బిందు/తుంపర సేద్యం వాడండి\n\n📞 **వ్యక్తిగత సలహా కోసం:** కిసాన్ కాల్ సెంటర్ 1800-180-1551 (టోల్-ఫ్రీ)`
+    },
+    'ml-IN': {
+        default: `നിങ്ങളുടെ ചോദ്യത്തിന് നന്ദി! ഇതാ എന്റെ ശുപാർശകൾ:\n\n🌾 മികച്ച കൃഷി രീതികൾക്കായി:\n\n1. **മണ്ണ് പരിശോധന** — അടുത്തുള്ള KVK-യിൽ മണ്ണ് പരിശോധന നടത്തുക (സൗജന്യ സേവനം)\n2. **വിള തിരഞ്ഞെടുക്കൽ** — മണ്ണിന്റെ തരവും പ്രാദേശിക കാലാവസ്ഥയും അനുസരിച്ച് വിള തിരഞ്ഞെടുക്കുക\n3. **ജല പരിപാലനം** — ജലം ലാഭിക്കാൻ ഡ്രിപ്/സ്‌പ്രിങ്ക്ലർ ജലസേചനം ഉപയോഗിക്കുക\n\n📞 **വ്യക്തിഗത ഉപദേശത്തിന്:** കിസാൻ കോൾ സെന്റർ 1800-180-1551 (ടോൾ-ഫ്രീ)`
+    },
+    'bn-IN': {
+        default: `আপনার প্রশ্নের জন্য ধন্যবাদ! এখানে আমার সুপারিশ রয়েছে:\n\n🌾 সেরা কৃষি পদ্ধতির জন্য:\n\n1. **মাটি পরীক্ষা** — নিকটতম KVK-তে মাটি পরীক্ষা করান (বিনামূল্যে)\n2. **ফসল নির্বাচন** — মাটির ধরন ও স্থানীয় আবহাওয়ার ভিত্তিতে ফসল বাছুন\n3. **জল ব্যবস্থাপনা** — জল সংরক্ষণে ড্রিপ/স্প্রিংকলার সেচ ব্যবহার করুন\n\n📞 **ব্যক্তিগত পরামর্শের জন্য:** কিষাণ কল সেন্টার 1800-180-1551 (টোল-ফ্রি)`
+    },
+    'mr-IN': {
+        default: `तुमच्या प्रश्नासाठी धन्यवाद! येथे माझ्या शिफारसी आहेत:\n\n🌾 सर्वोत्तम शेती पद्धतींसाठी:\n\n1. **माती परीक्षण** — जवळच्या KVK मध्ये माती तपासणी करा (मोफत सेवा)\n2. **पीक निवड** — मातीचा प्रकार आणि स्थानिक हवामानानुसार पीक निवडा\n3. **जल व्यवस्थापन** — पाणी वाचवण्यासाठी ठिबक/तुषार सिंचन वापरा\n\n📞 **वैयक्तिक सल्ल्यासाठी:** किसान कॉल सेंटर 1800-180-1551 (टोल-फ्री)`
+    },
+    'gu-IN': {
+        default: `તમારા પ્રશ્ન માટે આભાર! અહીં મારી ભલામણો છે:\n\n🌾 શ્રેષ્ઠ ખેતી પદ્ધતિઓ માટે:\n\n1. **જમીન પરીક્ષણ** — નજીકના KVK માં જમીન પરીક્ષણ કરાવો (મફત સેવા)\n2. **પાક પસંદગી** — જમીનના પ્રકાર અને સ્થાનિક હવામાન આધારે પાક પસંદ કરો\n3. **જળ વ્યવસ્થાપન** — પાણી બચાવવા ટપક/છંટકાવ સિંચાઈ વાપરો\n\n📞 **વ્યક્તિગત સલાહ માટે:** કિસાન કોલ સેન્ટર 1800-180-1551 (ટોલ-ફ્રી)`
+    },
+    'pa-IN': {
+        default: `ਤੁਹਾਡੇ ਸਵਾਲ ਲਈ ਧੰਨਵਾਦ! ਇੱਥੇ ਮੇਰੀਆਂ ਸਿਫ਼ਾਰਸ਼ਾਂ ਹਨ:\n\n🌾 ਵਧੀਆ ਖੇਤੀ ਤਰੀਕਿਆਂ ਲਈ:\n\n1. **ਮਿੱਟੀ ਪਰਖ** — ਨੇੜੇ ਦੇ KVK ਵਿੱਚ ਮਿੱਟੀ ਦੀ ਜਾਂਚ ਕਰਵਾਓ (ਮੁਫ਼ਤ ਸੇਵਾ)\n2. **ਫ਼ਸਲ ਚੋਣ** — ਮਿੱਟੀ ਦੀ ਕਿਸਮ ਅਤੇ ਸਥਾਨਕ ਮੌਸਮ ਅਨੁਸਾਰ ਫ਼ਸਲ ਚੁਣੋ\n3. **ਪਾਣੀ ਪ੍ਰਬੰਧ** — ਪਾਣੀ ਬਚਾਉਣ ਲਈ ਤੁਪਕਾ/ਫੁਹਾਰਾ ਸਿੰਚਾਈ ਵਰਤੋ\n\n📞 **ਨਿੱਜੀ ਸਲਾਹ ਲਈ:** ਕਿਸਾਨ ਕਾਲ ਸੈਂਟਰ 1800-180-1551 (ਟੋਲ-ਫ਼ਰੀ)`
+    },
+    'or-IN': {
+        default: `ଆପଣଙ୍କ ପ୍ରଶ୍ନ ପାଇଁ ଧନ୍ୟବାଦ! ଏଠାରେ ମୋ ସୁପାରିଶ ଅଛି:\n\n🌾 ସର୍ବୋତ୍ତମ ଚାଷ ପଦ୍ଧତି ପାଇଁ:\n\n1. **ମାଟି ପରୀକ୍ଷା** — ନିକଟତମ KVK ରେ ମାଟି ପରୀକ୍ଷା କରାନ୍ତୁ (ମାଗଣା ସେବା)\n2. **ଫସଲ ଚୟନ** — ମାଟିର ପ୍ରକାର ଓ ସ୍ଥାନୀୟ ପାଣିପାଗ ଅନୁସାରେ ଫସଲ ଚୟନ କରନ୍ତୁ\n3. **ଜଳ ପରିଚାଳନା** — ଜଳ ସଞ୍ଚୟ ପାଇଁ ଡ୍ରିପ୍/ସ୍ପ୍ରିଙ୍କଲର ଜଳସେଚନ ବ୍ୟବହାର କରନ୍ତୁ\n\n📞 **ବ୍ୟକ୍ତିଗତ ଉପଦେଶ ପାଇଁ:** କିସାନ କଲ ସେଣ୍ଟର 1800-180-1551 (ଟୋଲ-ଫ୍ରୀ)`
+    },
+    'as-IN': {
+        default: `আপোনাৰ প্ৰশ্নৰ বাবে ধন্যবাদ! ইয়াত মোৰ পৰামৰ্শ আছে:\n\n🌾 উত্তম কৃষি পদ্ধতিৰ বাবে:\n\n1. **মাটি পৰীক্ষা** — নিকটতম KVK ত মাটি পৰীক্ষা কৰক (বিনামূলীয়া সেৱা)\n2. **শস্য নিৰ্বাচন** — মাটিৰ প্ৰকাৰ আৰু স্থানীয় বতৰ অনুসৰি শস্য বাছক\n3. **জল ব্যৱস্থাপনা** — পানী ৰাহি কৰিবলৈ ড্ৰিপ/স্প্ৰিংকলাৰ জলসিঞ্চন ব্যৱহাৰ কৰক\n\n📞 **ব্যক্তিগত পৰামৰ্শৰ বাবে:** কিষাণ কল চেণ্টাৰ 1800-180-1551 (টোল-ফ্ৰী)`
+    },
+    'ur-IN': {
+        default: `آپ کے سوال کا شکریہ! یہاں میری سفارشات ہیں:\n\n🌾 بہترین کھیتی کے طریقوں کے لیے:\n\n1. **مٹی کی جانچ** — قریبی KVK میں مٹی کی جانچ کرائیں (مفت سروس)\n2. **فصل کی پسند** — مٹی کی قسم اور مقامی موسم کی بنیاد پر فصل منتخب کریں\n3. **پانی کا انتظام** — پانی بچانے کے لیے ڈرپ/سپرنکلر آبپاشی استعمال کریں\n\n📞 **ذاتی مشورے کے لیے:** کسان کال سینٹر 1800-180-1551 (ٹول فری)`
+    },
+};
+
+// ── Location extraction ──────────────────────────────────────────────────────
+
+const INDIAN_LOCATIONS = {
+    // Tamil Nadu
+    'chennai': { en: 'Chennai', ta: 'சென்னை', temp: '31°C', humidity: '78%', rain: '2 mm', condition_en: 'Partly cloudy, humid', condition_ta: 'ஓரளவு மேகமூட்டம், ஈரப்பதம்' },
+    'சென்னை': { en: 'Chennai', ta: 'சென்னை', temp: '31°C', humidity: '78%', rain: '2 mm', condition_en: 'Partly cloudy, humid', condition_ta: 'ஓரளவு மேகமூட்டம், ஈரப்பதம்' },
+    'madurai': { en: 'Madurai', ta: 'மதுரை', temp: '34°C', humidity: '55%', rain: '0 mm', condition_en: 'Clear sky, hot', condition_ta: 'தெளிவான வானம், வெப்பம்' },
+    'மதுரை': { en: 'Madurai', ta: 'மதுரை', temp: '34°C', humidity: '55%', rain: '0 mm', condition_en: 'Clear sky, hot', condition_ta: 'தெளிவான வானம், வெப்பம்' },
+    'coimbatore': { en: 'Coimbatore', ta: 'கோயம்புத்தூர்', temp: '29°C', humidity: '65%', rain: '0 mm', condition_en: 'Pleasant, partly cloudy', condition_ta: 'இனிமையான, ஓரளவு மேகமூட்டம்' },
+    'கோயம்புத்தூர்': { en: 'Coimbatore', ta: 'கோயம்புத்தூர்', temp: '29°C', humidity: '65%', rain: '0 mm', condition_en: 'Pleasant, partly cloudy', condition_ta: 'இனிமையான, ஓரளவு மேகமூட்டம்' },
+    'திருச்சி': { en: 'Tiruchirappalli', ta: 'திருச்சி', temp: '33°C', humidity: '60%', rain: '0 mm', condition_en: 'Sunny', condition_ta: 'வெயில்' },
+    'trichy': { en: 'Tiruchirappalli', ta: 'திருச்சி', temp: '33°C', humidity: '60%', rain: '0 mm', condition_en: 'Sunny', condition_ta: 'வெயில்' },
+    'salem': { en: 'Salem', ta: 'சேலம்', temp: '32°C', humidity: '58%', rain: '0 mm', condition_en: 'Clear sky', condition_ta: 'தெளிவான வானம்' },
+    'சேலம்': { en: 'Salem', ta: 'சேலம்', temp: '32°C', humidity: '58%', rain: '0 mm', condition_en: 'Clear sky', condition_ta: 'தெளிவான வானம்' },
+    'thanjavur': { en: 'Thanjavur', ta: 'தஞ்சாவூர்', temp: '33°C', humidity: '70%', rain: '1 mm', condition_en: 'Humid, partly cloudy', condition_ta: 'ஈரப்பதம், ஓரளவு மேகமூட்டம்' },
+    'தஞ்சாவூர்': { en: 'Thanjavur', ta: 'தஞ்சாவூர்', temp: '33°C', humidity: '70%', rain: '1 mm', condition_en: 'Humid, partly cloudy', condition_ta: 'ஈரப்பதம், ஓரளவு மேகமூட்டம்' },
+    'tirunelveli': { en: 'Tirunelveli', ta: 'திருநெல்வேலி', temp: '34°C', humidity: '62%', rain: '0 mm', condition_en: 'Hot and dry', condition_ta: 'வெப்பமும் வறண்டதும்' },
+    'திருநெல்வேலி': { en: 'Tirunelveli', ta: 'திருநெல்வேலி', temp: '34°C', humidity: '62%', rain: '0 mm', condition_en: 'Hot and dry', condition_ta: 'வெப்பமும் வறண்டதும்' },
+    'erode': { en: 'Erode', ta: 'ஈரோடு', temp: '33°C', humidity: '52%', rain: '0 mm', condition_en: 'Clear sky', condition_ta: 'தெளிவான வானம்' },
+    'ஈரோடு': { en: 'Erode', ta: 'ஈரோடு', temp: '33°C', humidity: '52%', rain: '0 mm', condition_en: 'Clear sky', condition_ta: 'தெளிவான வானம்' },
+    'vellore': { en: 'Vellore', ta: 'வேலூர்', temp: '32°C', humidity: '60%', rain: '0 mm', condition_en: 'Warm', condition_ta: 'வெப்பமான' },
+    'வேலூர்': { en: 'Vellore', ta: 'வேலூர்', temp: '32°C', humidity: '60%', rain: '0 mm', condition_en: 'Warm', condition_ta: 'வெப்பமான' },
+    // Karnataka
+    'bangalore': { en: 'Bangalore', kn: 'ಬೆಂಗಳೂರು', temp: '27°C', humidity: '60%', rain: '0 mm', condition_en: 'Pleasant', condition_kn: 'ಆಹ್ಲಾದಕರ' },
+    'bengaluru': { en: 'Bengaluru', kn: 'ಬೆಂಗಳೂರು', temp: '27°C', humidity: '60%', rain: '0 mm', condition_en: 'Pleasant', condition_kn: 'ಆಹ್ಲಾದಕರ' },
+    'ಬೆಂಗಳೂರು': { en: 'Bengaluru', kn: 'ಬೆಂಗಳೂರು', temp: '27°C', humidity: '60%', rain: '0 mm', condition_en: 'Pleasant', condition_kn: 'ಆಹ್ಲಾದಕರ' },
+    'mysore': { en: 'Mysore', kn: 'ಮೈಸೂರು', temp: '28°C', humidity: '55%', rain: '0 mm', condition_en: 'Clear sky', condition_kn: 'ನಿರ್ಮಲ ಆಕಾಶ' },
+    'mysuru': { en: 'Mysuru', kn: 'ಮೈಸೂರು', temp: '28°C', humidity: '55%', rain: '0 mm', condition_en: 'Clear sky', condition_kn: 'ನಿರ್ಮಲ ಆಕಾಶ' },
+    'ಮೈಸೂರು': { en: 'Mysuru', kn: 'ಮೈಸೂರು', temp: '28°C', humidity: '55%', rain: '0 mm', condition_en: 'Clear sky', condition_kn: 'ನಿರ್ಮಲ ಆಕಾಶ' },
+    'hubli': { en: 'Hubli', kn: 'ಹುಬ್ಬಳ್ಳಿ', temp: '30°C', humidity: '50%', rain: '0 mm', condition_en: 'Warm, clear', condition_kn: 'ಬೆಚ್ಚಗಿನ, ನಿರ್ಮಲ' },
+    'ಹುಬ್ಬಳ್ಳಿ': { en: 'Hubli', kn: 'ಹುಬ್ಬಳ್ಳಿ', temp: '30°C', humidity: '50%', rain: '0 mm', condition_en: 'Warm, clear', condition_kn: 'ಬೆಚ್ಚಗಿನ, ನಿರ್ಮಲ' },
+    // Andhra Pradesh / Telangana
+    'hyderabad': { en: 'Hyderabad', te: 'హైదరాబాద్', temp: '32°C', humidity: '45%', rain: '0 mm', condition_en: 'Clear sky, warm', condition_te: 'నిర్మలమైన ఆకాశం, వెచ్చని' },
+    'హైదరాబాద్': { en: 'Hyderabad', te: 'హైదరాబాద్', temp: '32°C', humidity: '45%', rain: '0 mm', condition_en: 'Clear sky, warm', condition_te: 'నిర్మలమైన ఆకాశం, వెచ్చని' },
+    'visakhapatnam': { en: 'Visakhapatnam', te: 'విశాఖపట్నం', temp: '30°C', humidity: '75%', rain: '1 mm', condition_en: 'Coastal humid', condition_te: 'తీర ఈర్పం' },
+    'విశాఖపట్నం': { en: 'Visakhapatnam', te: 'విశాఖపట్నం', temp: '30°C', humidity: '75%', rain: '1 mm', condition_en: 'Coastal humid', condition_te: 'తీర ఈర్పం' },
+    // Major cities across India
+    'delhi': { en: 'Delhi', hi: 'दिल्ली', temp: '35°C', humidity: '40%', rain: '0 mm', condition_en: 'Hot, clear', condition_hi: 'गर्म, साफ' },
+    'दिल्ली': { en: 'Delhi', hi: 'दिल्ली', temp: '35°C', humidity: '40%', rain: '0 mm', condition_en: 'Hot, clear', condition_hi: 'गर्म, साफ' },
+    'mumbai': { en: 'Mumbai', hi: 'मुंबई', temp: '30°C', humidity: '80%', rain: '3 mm', condition_en: 'Humid, partly cloudy', condition_hi: 'नम, आंशिक बादल' },
+    'मुंबई': { en: 'Mumbai', hi: 'मुंबई', temp: '30°C', humidity: '80%', rain: '3 mm', condition_en: 'Humid, partly cloudy', condition_hi: 'नम, आंशिक बादल' },
+    'kolkata': { en: 'Kolkata', hi: 'कोलकाता', temp: '32°C', humidity: '75%', rain: '0 mm', condition_en: 'Warm, humid', condition_hi: 'गर्म, नम' },
+    'pune': { en: 'Pune', hi: 'पुणे', temp: '31°C', humidity: '50%', rain: '0 mm', condition_en: 'Pleasant', condition_hi: 'सुहावना' },
+    'lucknow': { en: 'Lucknow', hi: 'लखनऊ', temp: '34°C', humidity: '45%', rain: '0 mm', condition_en: 'Hot', condition_hi: 'गर्म' },
+    'लखनऊ': { en: 'Lucknow', hi: 'लखनऊ', temp: '34°C', humidity: '45%', rain: '0 mm', condition_en: 'Hot', condition_hi: 'गर्म' },
+    'jaipur': { en: 'Jaipur', hi: 'जयपुर', temp: '36°C', humidity: '30%', rain: '0 mm', condition_en: 'Hot, dry', condition_hi: 'गर्म, शुष्क' },
+    'जयपुर': { en: 'Jaipur', hi: 'जयपुर', temp: '36°C', humidity: '30%', rain: '0 mm', condition_en: 'Hot, dry', condition_hi: 'गर्म, शुष्क' },
+    'ahmedabad': { en: 'Ahmedabad', hi: 'अहमदाबाद', temp: '35°C', humidity: '35%', rain: '0 mm', condition_en: 'Hot, clear', condition_hi: 'गर्म, साफ' },
+    'nagpur': { en: 'Nagpur', hi: 'नागपुर', temp: '37°C', humidity: '35%', rain: '0 mm', condition_en: 'Very hot', condition_hi: 'बहुत गर्म' },
+    'kochi': { en: 'Kochi', ml: 'കൊച്ചി', temp: '29°C', humidity: '82%', rain: '5 mm', condition_en: 'Rainy, tropical', condition_ml: 'മഴ, ഉഷ്ണമേഖല' },
+    'thiruvananthapuram': { en: 'Thiruvananthapuram', ml: 'തിരുവനന്തപുരം', temp: '30°C', humidity: '80%', rain: '3 mm', condition_en: 'Warm, rainy', condition_ml: 'ചൂടുള്ള, മഴ' },
+    'bhopal': { en: 'Bhopal', hi: 'भोपाल', temp: '33°C', humidity: '50%', rain: '0 mm', condition_en: 'Warm', condition_hi: 'गर्म' },
+    'patna': { en: 'Patna', hi: 'पटना', temp: '33°C', humidity: '65%', rain: '0 mm', condition_en: 'Warm, humid', condition_hi: 'गर्म, नम' },
+    'ranchi': { en: 'Ranchi', hi: 'रांची', temp: '30°C', humidity: '55%', rain: '0 mm', condition_en: 'Pleasant', condition_hi: 'सुहावना' },
+    'guwahati': { en: 'Guwahati', as: 'গুৱাহাটী', temp: '28°C', humidity: '70%', rain: '2 mm', condition_en: 'Humid, partly cloudy' },
+    'bhubaneswar': { en: 'Bhubaneswar', or: 'ଭୁବନେଶ୍ୱର', temp: '31°C', humidity: '72%', rain: '1 mm', condition_en: 'Warm, humid' },
+};
+
+function extractLocation(text) {
+    const lowerText = text.toLowerCase();
+    // Try to match location names (check longer names first to avoid partial matches)
+    const sortedKeys = Object.keys(INDIAN_LOCATIONS).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+        if (lowerText.includes(key.toLowerCase()) || text.includes(key)) {
+            return INDIAN_LOCATIONS[key] || INDIAN_LOCATIONS[key.toLowerCase()];
+        }
+    }
+    return null;
+}
+
+function buildLocationWeatherResponse(loc, lang) {
+    const langKey = lang.replace('-IN', '');
+    const locName = loc[langKey] || loc.en;
+    const condition = loc['condition_' + langKey] || loc.condition_en;
+
+    if (lang === 'ta-IN') {
+        return `**📍 ${locName} - தற்போதைய வானிலை:**\n\n🌡️ **வெப்பநிலை:** ${loc.temp}\n💧 **ஈரப்பதம்:** ${loc.humidity}\n🌧️ **மழைப்பொழிவு:** ${loc.rain}\n☁️ **நிலை:** ${condition}\n\n📅 **5 நாள் முன்னறிவிப்பு (${locName}):**\n- இன்று: ${condition}, ${loc.temp}\n- நாளை: ஓரளவு மேகமூட்டம், ${parseInt(loc.temp)-1}°C\n- 3ம் நாள்: லேசான மழை வாய்ப்பு, ${parseInt(loc.temp)-3}°C\n- 4ம் நாள்: மிதமான மழை, ${parseInt(loc.temp)-4}°C\n- 5ம் நாள்: தெளிவாகும், ${parseInt(loc.temp)-1}°C\n\n🌾 **${locName} விவசாய ஆலோசனை:**\n- நிலம் தயாரிப்பு மற்றும் விதைப்புக்கு ஏற்ற நிலை\n- மழை எதிர்பார்க்கப்பட்டால் உர பயன்பாட்டை தாமதப்படுத்துங்கள்\n- பள்ளமான நிலங்களில் வடிகால் உறுதி செய்யுங்கள்\n\n📱 **குறிப்பு:** வானிலை பக்கத்தில் ${locName} நேரடி புதுப்பிப்புகளைப் பாருங்கள்!\n📞 **IMD ஹெல்ப்லைன்:** 1800-180-1717`;
+    }
+    if (lang === 'hi-IN') {
+        const hiName = loc.hi || loc.en;
+        const hiCond = loc.condition_hi || loc.condition_en;
+        return `**📍 ${hiName} - वर्तमान मौसम:**\n\n🌡️ **तापमान:** ${loc.temp}\n💧 **आर्द्रता:** ${loc.humidity}\n🌧️ **वर्षा:** ${loc.rain}\n☁️ **स्थिति:** ${hiCond}\n\n📅 **5 दिन का पूर्वानुमान (${hiName}):**\n- आज: ${hiCond}, ${loc.temp}\n- कल: आंशिक बादल, ${parseInt(loc.temp)-1}°C\n- तीसरा दिन: हल्की बारिश की संभावना, ${parseInt(loc.temp)-3}°C\n- चौथा दिन: मध्यम बारिश, ${parseInt(loc.temp)-4}°C\n- पांचवां दिन: साफ, ${parseInt(loc.temp)-1}°C\n\n🌾 **${hiName} कृषि सलाह:**\n- खेत तैयारी और बुवाई के लिए अच्छी स्थिति\n- बारिश अपेक्षित हो तो उर्वरक देने में देरी करें\n- निचले इलाकों में जल निकासी सुनिश्चित करें\n\n📞 **IMD हेल्पलाइन:** 1800-180-1717`;
+    }
+    if (lang === 'kn-IN') {
+        const knName = loc.kn || loc.en;
+        const knCond = loc.condition_kn || loc.condition_en;
+        return `**📍 ${knName} - ಪ್ರಸ್ತುತ ಹವಾಮಾನ:**\n\n🌡️ **ತಾಪಮಾನ:** ${loc.temp}\n💧 **ಆರ್ದ್ರತೆ:** ${loc.humidity}\n🌧️ **ಮಳೆ:** ${loc.rain}\n☁️ **ಸ್ಥಿತಿ:** ${knCond}\n\n📅 **5 ದಿನಗಳ ಮುನ್ಸೂಚನೆ (${knName}):**\n- ಇಂದು: ${knCond}, ${loc.temp}\n- ನಾಳೆ: ಭಾಗಶಃ ಮೋಡ, ${parseInt(loc.temp)-1}°C\n- 3ನೇ ದಿನ: ಹಗುರ ಮಳೆ, ${parseInt(loc.temp)-3}°C\n\n🌾 **${knName} ಕೃಷಿ ಸಲಹೆ:**\n- ಹೊಲ ತಯಾರಿ ಮತ್ತು ಬಿತ್ತನೆಗೆ ಒಳ್ಳೆಯ ಪರಿಸ್ಥಿತಿ\n- ಮಳೆ ನಿರೀಕ್ಷಿಸಿದರೆ ಗೊಬ್ಬರ ಮುಂದೂಡಿ\n\n📞 **IMD ಸಹಾಯವಾಣಿ:** 1800-180-1717`;
+    }
+    if (lang === 'te-IN') {
+        const teName = loc.te || loc.en;
+        const teCond = loc.condition_te || loc.condition_en;
+        return `**📍 ${teName} - ప్రస్తుత వాతావరణం:**\n\n🌡️ **ఉష్ణోగ్రత:** ${loc.temp}\n💧 **తేమ:** ${loc.humidity}\n🌧️ **వర్షపాతం:** ${loc.rain}\n☁️ **స్థితి:** ${teCond}\n\n📅 **5 రోజుల అంచనా (${teName}):**\n- ఈరోజు: ${teCond}, ${loc.temp}\n- రేపు: పాక్షిక మేఘావృతం, ${parseInt(loc.temp)-1}°C\n- 3వ రోజు: తేలిక వర్షం, ${parseInt(loc.temp)-3}°C\n\n🌾 **${teName} వ్యవసాయ సలహా:**\n- పొలం సిద్ధం చేయడానికి మంచి పరిస్థితులు\n- వర్షం ఆశించినట్లయితే ఎరువుల వాడకం ఆలస్యం చేయండి\n\n📞 **IMD హెల్ప్‌లైన్:** 1800-180-1717`;
+    }
+    // Default: English
+    return `**📍 ${loc.en} - Current Weather:**\n\n🌡️ **Temperature:** ${loc.temp}\n💧 **Humidity:** ${loc.humidity}\n🌧️ **Rainfall:** ${loc.rain}\n☁️ **Condition:** ${condition}\n\n📅 **5-Day Forecast (${loc.en}):**\n- Today: ${condition}, ${loc.temp}\n- Tomorrow: Partly cloudy, ${parseInt(loc.temp)-1}°C\n- Day 3: Light rain expected, ${parseInt(loc.temp)-3}°C\n- Day 4: Moderate rain, ${parseInt(loc.temp)-4}°C\n- Day 5: Clearing up, ${parseInt(loc.temp)-1}°C\n\n🌾 **${loc.en} Farming Advisory:**\n- Good conditions for field preparation and sowing\n- If rain expected, delay fertilizer application\n- Ensure proper drainage in low-lying fields\n\n📱 **Tip:** Check the Weather page for live updates for ${loc.en}!\n📞 **IMD Helpline:** 1800-180-1717`;
+}
+
+// ── Keyword patterns (language-agnostic) ─────────────────────────────────────
+
+const KEYWORD_PATTERNS = {
+    weather: /weather|forecast|rain|temperature|climate|humidity|wind|மழை|வானிலை|வெப்பநிலை|காலநிலை|ஈரப்பதம்|मौसम|बारिश|तापमान|हवामान|ಮಳೆ|ಹವಾಮಾನ|ವಾತಾವರಣ|వాతావరణం|వర్షం|ఉష్ణోగ్రత|আবহাওয়া|বৃষ্টি|বতৰ|ବର୍ଷା|ପାଣିପାଗ|موسم|بارش/i,
+    price: /price|market|rate|mandi|cost|விலை|சந்தை|மண்டி|दाम|भाव|बाजार|मंडी|ಬೆಲೆ|ಮಾರುಕಟ್ಟೆ|ధర|మార్కెట్|বাজার|দাম|ભાવ|બજાર|ਭਾਅ|ਮੰਡੀ|ବଜାର|ଦାମ|قیمت|بازار|sell|buy|crop.*rate|rate.*crop/i,
+    kharif: /kharif|kharif|खरीफ|ಖಾರಿಫ್|ఖరీఫ్|காரிஃப்|ખરીफ|खरीप|ଖରିଫ|season|crop.*plant|ಬೆಳೆ.*ಬೆಳೆ|என்ன.*பயிர்|ಯಾವ.*ಬೆಳೆ| फसल.*बो|কোন.*ফসল|কি.*শস্য|কি চাষ|কি বীজ|പയിര്|what.*plant|what.*grow|sow/i,
+    pest: /pest|कीट|ಕೀಟ|పురుగు|பூச்சி|કીટ|कीड|କୀଟ|insect|bug|disease|roga|rog|রোগ|ৰোগ|रोग|ರೋಗ|నొప్పి|நோய்|control|নিয়ন্ত্রণ|নিয়ন্ত্ৰণ/i,
+    scheme: /scheme|pm.?kisan|kisan|योजना|ಯೋಜನೆ|పథకం|திட்ட|યોજના|আঁচনি|ଯୋଜନା|سکیم|subsid|grant|benefit|government|সরকার|সৰকাৰ|ಸರ್ಕಾರ|ప్రభుత్వ/i,
+    irrigation: /irrigat|water|drip|sprinkler|सिंचाई|ನೀರಾವರಿ|సాగునీటி|நீர்ப்பாசன|સિંચાઈ|सिंचन|ଜଳସେଚନ|জলসিঞ্চন|জলসেচ|آبپاشی|ನೀರು|నీరు|நீர்|pani|paani/i,
+};
+
+function matchTopic(text) {
+    for (const [topic, regex] of Object.entries(KEYWORD_PATTERNS)) {
+        if (regex.test(text)) return topic;
+    }
+    return 'default';
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+export async function mockChat(message, sessionId, language) {
+    await new Promise(r => setTimeout(r, 600 + Math.random() * 800));
+
+    // Detect language from the message text, fallback to selected language
+    const detectedLang = detectLanguageFromText(message, language);
+    const responseLang = detectedLang || language || 'en-IN';
+
+    const topic = matchTopic(message);
+
+    // For weather topic, try to extract a specific location
+    if (topic === 'weather') {
+        const location = extractLocation(message);
+        if (location) {
+            const locationReply = buildLocationWeatherResponse(location, responseLang);
+            return {
+                status: 'success',
+                data: {
+                    reply: locationReply,
+                    session_id: sessionId,
+                    detected_language: responseLang,
+                }
+            };
+        }
+    }
+
+    const langResponses = RESPONSES[responseLang] || RESPONSES['en-IN'];
+    const reply = langResponses[topic] || langResponses.default || RESPONSES['en-IN'].default;
+
+    return {
+        status: 'success',
+        data: {
+            reply,
+            session_id: sessionId,
+            detected_language: responseLang,
+        }
+    };
+}
+
+export async function mockImageAnalyze(imageBase64, cropName, state, language) {
+    await new Promise(r => setTimeout(r, 800 + Math.random() * 1000));
+
+    const lang = language || 'en-IN';
+    const crop = cropName || 'Crop';
+    const region = state || 'India';
+
+    const analyses = {
+        'en-IN': `**Crop Analysis Report — ${crop} (${region})**\n\n🔍 **Identified Issue:** Early Blight (Alternaria solani)\n**Confidence:** 87%\n**Severity:** Moderate (25-30% leaf area affected)\n\n🩺 **Symptoms Detected:**\n- Dark brown concentric ring spots on lower leaves\n- Yellowing around lesion margins\n- Premature leaf drop beginning\n- Target-shaped lesions with characteristic bull's-eye pattern\n\n💊 **Recommended Treatment:**\n1. **Immediate:** Spray Mancozeb 75% WP @ 2.5g/litre\n2. **Follow-up (7 days):** Chlorothalonil 75% WP @ 2g/litre\n3. **Preventive:** Trichoderma viride soil application @ 2.5 kg/acre\n4. **Bio-control:** Pseudomonas fluorescens spray @ 5g/litre\n\n🌿 **Organic Alternatives:**\n- Neem oil spray (5ml/litre) every 10 days\n- Copper oxychloride 50% WP @ 3g/litre\n- Panchagavya spray (3%) as preventive\n\n🌱 **Cultural Practices:**\n- Remove and destroy infected leaves immediately\n- Ensure proper plant spacing (45×30 cm) for air circulation\n- Avoid overhead irrigation — use drip irrigation\n- Apply balanced NPK fertilizer (120:60:60 kg/ha)\n- Mulch with paddy straw to prevent soil splash\n- Practice crop rotation with non-solanaceous crops\n\n📊 **Estimated Yield Impact:**\n- Without treatment: 30-40% yield loss expected\n- With treatment: Recovery possible within 2-3 weeks\n\n📅 **Follow-up Schedule:**\n- Day 3: Apply first spray\n- Day 10: Second spray + foliar nutrition\n- Day 17: Inspect for progress\n- Day 24: Preventive spray if needed\n\n📞 **For further help:**\n- Kisan Call Centre: 1800-180-1551 (toll-free)\n- Nearest KVK for lab-confirmed diagnosis\n- ICAR-IIHR Helpline: 080-23086100`,
+        'kn-IN': `**ಬೆಳೆ ವಿಶ್ಲೇಷಣೆ ವರದಿ — ${crop} (${region})**\n\n🔍 **ಗುರುತಿಸಿದ ಸಮಸ್ಯೆ:** ಆರಂಭಿಕ ಅಂಗಮಾರಿ (ಅಲ್ಟರ್ನೇರಿಯಾ ಸೊಲಾನಿ)\n**ವಿಶ್ವಾಸಾರ್ಹತೆ:** 87%\n**ತೀವ್ರತೆ:** ಮಧ್ಯಮ (25-30% ಎಲೆ ಪ್ರದೇಶ ಬಾಧಿತ)\n\n🩺 **ಕಂಡುಬಂದ ಲಕ್ಷಣಗಳು:**\n- ಕೆಳಗಿನ ಎಲೆಗಳ ಮೇಲೆ ಕಪ್ಪು-ಕಂದು ಕೇಂದ್ರೀಕೃತ ವಲಯ ಕಲೆಗಳು\n- ಗಾಯದ ಅಂಚುಗಳ ಸುತ್ತ ಹಳದಿ ಬಣ್ಣ\n- ಅಕಾಲಿಕ ಎಲೆ ಉದುರುವಿಕೆ ಆರಂಭ\n- ಗುರಿ-ಆಕಾರದ ಹುಣ್ಣುಗಳು\n\n💊 **ಶಿಫಾರಸು ಚಿಕಿತ್ಸೆ:**\n1. **ತಕ್ಷಣ:** ಮ್ಯಾಂಕೋಜೆಬ್ 75% WP @ 2.5ಗ್ರಾಂ/ಲೀಟರ್ ಸಿಂಪಡಿಸಿ\n2. **ಅನುಸರಣೆ (7 ದಿನ):** ಕ್ಲೋರೋಥಾಲೋನಿಲ್ 75% WP @ 2ಗ್ರಾಂ/ಲೀಟರ್\n3. **ತಡೆಗಟ್ಟುವಿಕೆ:** ಟ್ರೈಕೋಡರ್ಮಾ ವಿರಿಡೆ ಮಣ್ಣು ಅನ್ವಯ @ 2.5 ಕೆಜಿ/ಎಕರೆ\n4. **ಜೈವಿಕ ನಿಯಂತ್ರಣ:** ಸ್ಯೂಡೋಮೊನಾಸ್ ಫ್ಲೋರೆಸೆನ್ಸ್ @ 5ಗ್ರಾಂ/ಲೀಟರ್\n\n🌿 **ಸಾವಯವ ಪರ್ಯಾಯಗಳು:**\n- ಬೇವಿನ ಎಣ್ಣೆ ಸಿಂಪಡಣೆ (5ml/ಲೀಟರ್) ಪ್ರತಿ 10 ದಿನಗಳಿಗೊಮ್ಮೆ\n- ತಾಮ್ರ ಆಕ್ಸಿಕ್ಲೋರೈಡ್ 50% WP @ 3ಗ್ರಾಂ/ಲೀಟರ್\n- ಪಂಚಗವ್ಯ ಸಿಂಪಡಣೆ (3%) ತಡೆಗಟ್ಟುವಿಕೆಗಾಗಿ\n\n🌱 **ಸಾಂಸ್ಕೃತಿಕ ಪದ್ಧತಿಗಳು:**\n- ಸೋಂಕಿತ ಎಲೆಗಳನ್ನು ತಕ್ಷಣ ತೆಗೆದು ನಾಶಮಾಡಿ\n- ಗಾಳಿ ಸಂಚಾರಕ್ಕಾಗಿ ಸರಿಯಾದ ಅಂತರ ಕಾಪಾಡಿ (45×30 ಸೆಂ.ಮೀ)\n- ಮೇಲಿನ ನೀರಾವರಿ ತಪ್ಪಿಸಿ — ಹನಿ ನೀರಾವರಿ ಬಳಸಿ\n- ಸಮತೋಲಿತ NPK ಗೊಬ್ಬರ ಹಾಕಿ\n- ಬೆಳೆ ಸರದಿ ಅನುಸರಿಸಿ\n\n📊 **ಅಂದಾಜು ಇಳುವರಿ ಪರಿಣಾಮ:**\n- ಚಿಕಿತ್ಸೆ ಇಲ್ಲದೆ: 30-40% ಇಳುವರಿ ನಷ್ಟ\n- ಚಿಕಿತ್ಸೆಯೊಂದಿಗೆ: 2-3 ವಾರಗಳಲ್ಲಿ ಚೇತರಿಕೆ ಸಾಧ್ಯ\n\n📅 **ಅನುಸರಣೆ ವೇಳಾಪಟ್ಟಿ:**\n- 3ನೇ ದಿನ: ಮೊದಲ ಸಿಂಪಡಣೆ\n- 10ನೇ ದಿನ: ಎರಡನೇ ಸಿಂಪಡಣೆ + ಎಲೆ ಪೋಷಣೆ\n- 17ನೇ ದಿನ: ಪ್ರಗತಿ ಪರಿಶೀಲನೆ\n\n📞 **ಸಹಾಯಕ್ಕಾಗಿ:**\n- ಕಿಸಾನ್ ಕಾಲ್ ಸೆಂಟರ್: 1800-180-1551 (ಉಚಿತ)\n- ಹತ್ತಿರದ KVK ಗೆ ಭೇಟಿ ನೀಡಿ`,
+        'hi-IN': `**फसल विश्लेषण रिपोर्ट — ${crop} (${region})**\n\n🔍 **पहचानी गई समस्या:** अगेती अंगमारी (अल्टरनेरिया सोलेनी)\n**विश्वसनीयता:** 87%\n**गंभीरता:** मध्यम (25-30% पत्ती क्षेत्र प्रभावित)\n\n🩺 **पाए गए लक्षण:**\n- निचली पत्तियों पर गहरे भूरे संकेंद्रित वलय चित्ती\n- घाव के किनारों के चारों ओर पीलापन\n- समय से पहले पत्ती गिरना शुरू\n- बुल्स-आई पैटर्न वाले लक्ष्य-आकार के घाव\n\n💊 **अनुशंसित उपचार:**\n1. **तुरंत:** मैंकोजेब 75% WP @ 2.5ग्रा/लीटर छिड़काव\n2. **अनुवर्ती (7 दिन):** क्लोरोथैलोनिल 75% WP @ 2ग्रा/लीटर\n3. **रोकथाम:** ट्राइकोडर्मा विरिडी मिट्टी अनुप्रयोग @ 2.5 किग्रा/एकड़\n4. **जैव-नियंत्रण:** स्यूडोमोनास फ्लोरेसेन्स @ 5ग्रा/लीटर\n\n🌿 **जैविक विकल्प:**\n- नीम तेल छिड़काव (5ml/लीटर) हर 10 दिन\n- कॉपर ऑक्सीक्लोराइड 50% WP @ 3ग्रा/लीटर\n- पंचगव्य छिड़काव (3%) रोकथाम के लिए\n\n🌱 **सांस्कृतिक पद्धतियाँ:**\n- संक्रमित पत्तियों को तुरंत हटाकर नष्ट करें\n- हवा संचार के लिए उचित दूरी रखें (45×30 सेमी)\n- ऊपरी सिंचाई से बचें — ड्रिप सिंचाई उपयोग करें\n- संतुलित NPK उर्वरक (120:60:60 किग्रा/हे.) डालें\n- फसल चक्रण अपनाएं\n\n📊 **अनुमानित उपज प्रभाव:**\n- उपचार के बिना: 30-40% उपज हानि\n- उपचार के साथ: 2-3 सप्ताह में सुधार संभव\n\n📅 **अनुवर्ती कार्यक्रम:**\n- 3रा दिन: पहला छिड़काव\n- 10वां दिन: दूसरा छिड़काव + पर्ण पोषण\n- 17वां दिन: प्रगति जांच\n\n📞 **सहायता के लिए:**\n- किसान कॉल सेंटर: 1800-180-1551 (टोल-फ्री)\n- नजदीकी KVK से संपर्क करें`,
+        'ta-IN': `**பயிர் பகுப்பாய்வு அறிக்கை — ${crop} (${region})**\n\n🔍 **கண்டறியப்பட்ட பிரச்சினை:** ஆரம்ப அடிவெட்டு நோய் (அல்டர்னேரியா சொலானி)\n**நம்பகத்தன்மை:** 87%\n**தீவிரம்:** மிதமானது (25-30% இலைப் பரப்பு பாதிக்கப்பட்டது)\n\n🩺 **கண்டறியப்பட்ட அறிகுறிகள்:**\n- கீழ் இலைகளில் கருமையான பழுப்பு நிற செறிவான வளைய புள்ளிகள்\n- புண்களின் ஓரங்களைச் சுற்றி மஞ்சள் நிறம்\n- முன்கூட்டிய இலை உதிர்வு தொடங்குகிறது\n- குறி-வடிவ புண்கள் (காளை-கண் அமைப்பு)\n\n💊 **பரிந்துரைக்கப்பட்ட சிகிச்சை:**\n1. **உடனடி:** மான்கோசெப் 75% WP @ 2.5கிரா/லிட்டர் தெளிக்கவும்\n2. **தொடர்நடவடிக்கை (7 நாள்):** குளோரோதலோனில் 75% WP @ 2கிரா/லிட்டர்\n3. **தடுப்பு:** டிரைக்கோடெர்மா விரிடி மண் பயன்பாடு @ 2.5 கிலோ/ஏக்கர்\n4. **உயிர் கட்டுப்பாடு:** சூடோமோனாஸ் ஃப்ளோரசென்ஸ் @ 5கிரா/லிட்டர்\n\n🌿 **இயற்கை மாற்று வழிகள்:**\n- வேப்பெண்ணெய் தெளிப்பு (5ml/லிட்டர்) ஒவ்வொரு 10 நாட்களுக்கும்\n- காப்பர் ஆக்ஸிகுளோரைடு 50% WP @ 3கிரா/லிட்டர்\n- பஞ்சகவ்யா தெளிப்பு (3%) தடுப்புக்காக\n\n🌱 **பண்பாட்டு நடைமுறைகள்:**\n- பாதிக்கப்பட்ட இலைகளை உடனடியாக அகற்றி அழிக்கவும்\n- காற்று சுழற்சிக்கு சரியான இடைவெளி (45×30 செ.மீ) பராமரிக்கவும்\n- மேல்நிலை நீர்ப்பாசனம் தவிர்க்கவும் — சொட்டு நீர்ப்பாசனம் பயன்படுத்தவும்\n- சமநிலை NPK உரம் (120:60:60 கிலோ/ஹெ.) இடவும்\n- நெல் வைக்கோல் மூலம் மல்ச்சிங் செய்யவும்\n- பயிர் சுழற்சி பின்பற்றவும்\n\n📊 **மதிப்பிடப்பட்ட மகசூல் தாக்கம்:**\n- சிகிச்சை இல்லாமல்: 30-40% மகசூல் இழப்பு\n- சிகிச்சையுடன்: 2-3 வாரங்களில் மீட்பு சாத்தியம்\n\n📅 **பின்தொடர் அட்டவணை:**\n- 3வது நாள்: முதல் தெளிப்பு\n- 10வது நாள்: இரண்டாவது தெளிப்பு + இலை ஊட்டச்சத்து\n- 17வது நாள்: முன்னேற்றத்தை ஆய்வு செய்யவும்\n- 24வது நாள்: தேவைப்பட்டால் தடுப்பு தெளிப்பு\n\n📞 **உதவிக்கு:**\n- கிசான் கால் சென்டர்: 1800-180-1551 (கட்டணமில்லா)\n- அருகிலுள்ள KVK-யை தொடர்பு கொள்ளுங்கள்\n- TNAU உதவி எண்: 0422-6611200`,
+        'te-IN': `**పంట విశ్లేషణ నివేదిక — ${crop} (${region})**\n\n🔍 **గుర్తించిన సమస్య:** ముందస్తు ఆకుమచ్చ (ఆల్టర్నేరియా సొలానీ)\n**నమ్మకం:** 87%\n**తీవ్రత:** మధ్యస్థం (25-30% ఆకు ప్రాంతం ప్రభావితం)\n\n🩺 **గుర్తించిన లక్షణాలు:**\n- దిగువ ఆకులపై ముదురు గోధుమ రంగు కేంద్రీకృత వలయ మచ్చలు\n- గాయం అంచుల చుట్టూ పసుపు రంగు\n- ముందస్తు ఆకు రాలడం ప్రారంభం\n- బుల్స్-ఐ నమూనాతో లక్ష్య-ఆకార గాయాలు\n\n💊 **సిఫార్సు చేసిన చికిత్స:**\n1. **వెంటనే:** మాంకోజెబ్ 75% WP @ 2.5గ్రా/లీటర్ పిచికారి\n2. **అనుసరణ (7 రోజులు):** క్లోరోథలోనిల్ 75% WP @ 2గ్రా/లీటర్\n3. **నివారణ:** ట్రైకోడెర్మా విరిడే నేల అనువర్తనం @ 2.5 కిలో/ఎకరం\n4. **జీవ-నియంత్రణ:** సూడోమోనాస్ ఫ్లోరెసెన్స్ @ 5గ్రా/లీటర్\n\n🌿 **సేంద్రియ ప్రత్యామ్నాయాలు:**\n- వేప నూనె పిచికారి (5ml/లీటర్) ప్రతి 10 రోజులకు\n- కాపర్ ఆక్సీక్లోరైడ్ 50% WP @ 3గ్రా/లీటర్\n- పంచగవ్య పిచికారి (3%) నివారణ కోసం\n\n🌱 **సాగు పద్ధతులు:**\n- ప్రభావిత ఆకులను వెంటనే తొలగించి నాశనం చేయండి\n- గాలి ప్రసరణ కోసం సరైన దూరం పాటించండి (45×30 సెం.మీ)\n- ఓవర్‌హెడ్ నీటిపారుదల మానుకోండి — బిందు సేద్యం వాడండి\n- సమతుల్య NPK ఎరువులు వేయండి\n- పంట మార్పిడి పాటించండి\n\n📊 **అంచనా దిగుబడి ప్రభావం:**\n- చికిత్స లేకుండా: 30-40% దిగుబడి నష్టం\n- చికిత్సతో: 2-3 వారాలలో రికవరీ సాధ్యం\n\n📅 **అనుసరణ షెడ్యూల్:**\n- 3వ రోజు: మొదటి పిచికారి\n- 10వ రోజు: రెండవ పిచికారి + ఆకు పోషణ\n- 17వ రోజు: పురోగతి తనిఖీ\n\n📞 **సహాయం కోసం:**\n- కిసాన్ కాల్ సెంటర్: 1800-180-1551 (టోల్-ఫ్రీ)\n- సమీపంలోని KVK ను సంప్రదించండి`,
+    };
+
+    const result = analyses[lang] || analyses['en-IN'];
+
+    return {
+        status: 'success',
+        data: {
+            analysis: result,
+            crop: cropName,
+            state: state,
+        }
+    };
+}
+
+// ── Mock Prices — AI-enriched price data ────────────────────────────────────
+export async function mockPrices(cropName, language) {
+    await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
+    const lang = language || 'en-IN';
+
+    // AI advisory per crop
+    const advisories = {
+        'Rice': {
+            'en-IN': 'Rice prices peak in March-April when private traders compete with FCI. Consider storing for 2-3 months post-harvest for a 10-15% premium. Punjab & Haryana mandis offer strong MSP procurement.',
+            'ta-IN': 'அரிசி விலை மார்ச்-ஏப்ரல் மாதங்களில் உச்சமடையும். அறுவடைக்குப் பிறகு 2-3 மாதங்கள் சேமித்து 10-15% அதிக விலை பெறலாம்.',
+            'hi-IN': 'चावल की कीमतें मार्च-अप्रैल में चरम पर होती हैं। कटाई के बाद 2-3 महीने भंडारण करने पर 10-15% अधिक मूल्य मिल सकता है।',
+            'kn-IN': 'ಅಕ್ಕಿ ಬೆಲೆ ಮಾರ್ಚ್-ಏಪ್ರಿಲ್‌ನಲ್ಲಿ ಉತ್ತುಂಗಕ್ಕೇರುತ್ತದೆ. ಕೊಯ್ಲಿನ ನಂತರ 2-3 ತಿಂಗಳು ಸಂಗ್ರಹಿಸಿ 10-15% ಹೆಚ್ಚಿನ ಬೆಲೆ ಪಡೆಯಿರಿ.',
+            'te-IN': 'బియ్యం ధరలు మార్చి-ఏప్రిల్‌లో గరిష్ఠ స్థాయికి చేరతాయి. కోత తర్వాత 2-3 నెలలు నిల్వ చేస్తే 10-15% అధిక ధర పొందవచ్చు.',
+        },
+        'Wheat': {
+            'en-IN': 'Best wheat prices come in April-May post-harvest. Government procurement is strong in Punjab, Haryana, and MP. Store for 2-3 months if you have good storage facilities.',
+            'ta-IN': 'கோதுமை விலை ஏப்ரல்-மே மாதங்களில் சிறப்பாக இருக்கும். நல்ல சேமிப்பு வசதி இருந்தால் 2-3 மாதங்கள் சேமிக்கவும்.',
+            'hi-IN': 'गेहूं के सर्वोत्तम दाम अप्रैल-मई में आते हैं। पंजाब, हरियाणा और MP में सरकारी खरीद मजबूत है।',
+            'kn-IN': 'ಗೋಧಿ ಬೆಲೆ ಏಪ್ರಿಲ್-ಮೇನಲ್ಲಿ ಉತ್ತಮವಾಗಿರುತ್ತದೆ. ಒಳ್ಳೆಯ ಶೇಖರಣಾ ಸೌಲಭ್ಯ ಇದ್ದರೆ 2-3 ತಿಂಗಳು ಸಂಗ್ರಹಿಸಿ.',
+            'te-IN': 'గోధుమ ధరలు ఏప్రిల్-మేలో అత్యుత్తమంగా ఉంటాయి. మంచి నిల్వ సౌకర్యం ఉంటే 2-3 నెలలు నిల్వ చేయండి.',
+        },
+        'Cotton': {
+            'en-IN': 'Monitor international cotton prices closely. Sell in batches — 50% at harvest, 50% in Feb-March for best returns. Gujarat (Rajkot, Gondal) and Telangana mandis are key markets.',
+            'ta-IN': 'சர்வதேச பருத்தி விலையை கவனமாக கண்காணிக்கவும். 50% அறுவடையிலும், 50% பிப்-மார்ச்சிலும் விற்கவும்.',
+            'hi-IN': 'अंतरराष्ट्रीय कपास कीमतों पर नजर रखें। 50% कटाई पर और 50% फरवरी-मार्च में बेचें।',
+            'kn-IN': 'ಅಂತರರಾಷ್ಟ್ರೀಯ ಹತ್ತಿ ಬೆಲೆಯನ್ನು ನಿಕಟವಾಗಿ ಗಮನಿಸಿ. 50% ಕೊಯ್ಲಿನಲ್ಲಿ, 50% ಫೆಬ್ರವರಿ-ಮಾರ್ಚ್‌ನಲ್ಲಿ ಮಾರಾಟ ಮಾಡಿ.',
+            'te-IN': 'అంతర్జాతీయ పత్తి ధరలను నిశితంగా గమనించండి. 50% పంట సమయంలో, 50% ఫిబ్రవరి-మార్చిలో విక్రయించండి.',
+        },
+    };
+
+    // Default advisory for crops not in the map
+    const defaultAdvisory = {
+        'en-IN': 'Compare prices across 3-4 nearby mandis before selling. Use eNAM (enam.gov.in) for real-time mandi prices. If market price is below MSP, sell through government procurement channels.',
+        'ta-IN': 'விற்பதற்கு முன் 3-4 அருகிலுள்ள மண்டிகளில் விலையை ஒப்பிடுங்கள். நிகழ்நேர விலைக்கு eNAM (enam.gov.in) பயன்படுத்தவும்.',
+        'hi-IN': 'बेचने से पहले 3-4 पास की मंडियों में दाम तुलना करें। रीयल-टाइम मंडी भाव के लिए eNAM (enam.gov.in) इस्तेमाल करें।',
+        'kn-IN': 'ಮಾರಾಟ ಮಾಡುವ ಮುನ್ನ 3-4 ಹತ್ತಿರದ ಮಂಡಿಗಳಲ್ಲಿ ಬೆಲೆ ಹೋಲಿಸಿ. ನೈಜ-ಸಮಯದ ಬೆಲೆಗಳಿಗೆ eNAM (enam.gov.in) ಬಳಸಿ.',
+        'te-IN': 'అమ్మే ముందు 3-4 సమీప మండీలలో ధరలను పోల్చండి. రియల్-టైమ్ మండీ ధరల కోసం eNAM (enam.gov.in) వాడండి.',
+    };
+
+    const advisory = (advisories[cropName] && advisories[cropName][lang])
+        || (advisories[cropName] && advisories[cropName]['en-IN'])
+        || defaultAdvisory[lang]
+        || defaultAdvisory['en-IN'];
+
+    return {
+        status: 'success',
+        data: {
+            advisory,
+            source: 'AI Knowledge Base (Mock)',
+            lastUpdated: new Date().toISOString().split('T')[0],
+        }
+    };
+}
+
+// ── Mock Pest Advice — AI-enriched pesticide advisory ────────────────────────
+export async function mockPestAdvice(productName, category, usage, language) {
+    await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
+    const lang = language || 'en-IN';
+
+    // Determine if product is organic/bio
+    const isBio = /^Bio-|^Trap/.test(category);
+
+    const PEST_ADVISORIES = {
+        'Neem Oil (1L)': {
+            'en-IN': '**Neem Oil — Usage Guide**\n\n💧 **Dosage:** 5ml per litre of water. Spray in early morning or evening.\n\n🌱 **Best For Crops:** Rice, Cotton, Vegetables (Tomato, Brinjal, Okra), Pulses\n\n✅ **Advantages:** 100% organic, safe for beneficial insects (bees, ladybugs), no residue period, acts as both insecticide and fungicide.\n\n⏰ **Spray Interval:** Every 10-15 days as preventive; every 7 days during active infestation.\n\n⚠️ **Precautions:** Do not mix with chemical pesticides. Shake well before use. Use within 6 hours of mixing. Store in cool, dark place.\n\n🏷️ **Cost-Effective Tip:** Buy in bulk (5L) for ₹1,400-1,600 — saves 15-20% vs single litres.',
+            'ta-IN': '**வேப்பெண்ணெய் — பயன்பாட்டு வழிகாட்டி**\n\n💧 **அளவு:** 1 லிட்டர் நீருக்கு 5ml. காலை அல்லது மாலையில் தெளிக்கவும்.\n\n🌱 **சிறந்த பயிர்கள்:** நெல், பருத்தி, காய்கறிகள் (தக்காளி, கத்தரி, வெண்டை)\n\n✅ **நன்மைகள்:** 100% இயற்கை, நன்மை செய்யும் பூச்சிகளுக்கு பாதுகாப்பானது.\n\n⏰ **தெளிப்பு இடைவெளி:** தடுப்புக்கு 10-15 நாட்கள்; தொற்றின் போது 7 நாட்கள்.\n\n⚠️ **எச்சரிக்கை:** ரசாயன பூச்சிக்கொல்லிகளுடன் கலக்க வேண்டாம்.',
+            'hi-IN': '**नीम तेल — उपयोग गाइड**\n\n💧 **खुराक:** 5ml प्रति लीटर पानी। सुबह या शाम छिड़काव करें।\n\n🌱 **उपयुक्त फसलें:** धान, कपास, सब्जियां (टमाटर, बैंगन, भिंडी)\n\n✅ **लाभ:** 100% जैविक, लाभकारी कीटों के लिए सुरक्षित।\n\n⏰ **छिड़काव अंतराल:** रोकथाम के लिए 10-15 दिन; संक्रमण में 7 दिन।\n\n⚠️ **सावधानियां:** रासायनिक कीटनाशकों के साथ न मिलाएं।',
+            'kn-IN': '**ಬೇವಿನ ಎಣ್ಣೆ — ಬಳಕೆ ಮಾರ್ಗದರ್ಶಿ**\n\n💧 **ಪ್ರಮಾಣ:** 1 ಲೀಟರ್ ನೀರಿಗೆ 5ml. ಬೆಳಿಗ್ಗೆ ಅಥವಾ ಸಂಜೆ ಸಿಂಪಡಿಸಿ.\n\n🌱 **ಉತ್ತಮ ಬೆಳೆಗಳು:** ಭತ್ತ, ಹತ್ತಿ, ತರಕಾರಿಗಳು\n\n✅ **ಪ್ರಯೋಜನಗಳು:** 100% ಸಾವಯವ, ಉಪಯುಕ್ತ ಕೀಟಗಳಿಗೆ ಸುರಕ್ಷಿತ.\n\n⏰ **ಸಿಂಪಡಣೆ ಮಧ್ಯಂತರ:** ತಡೆಗಟ್ಟಲು 10-15 ದಿನ; ಮುತ್ತಿಕೊಳ್ಳುವಿಕೆಯಲ್ಲಿ 7 ದಿನ.',
+            'te-IN': '**వేప నూనె — వాడకం గైడ్**\n\n💧 **మోతాదు:** 1 లీటర్ నీటికి 5ml. ఉదయం లేదా సాయంత్రం పిచికారీ చేయండి.\n\n🌱 **ఉత్తమ పంటలు:** వరి, పత్తి, కూరగాయలు\n\n✅ **ప్రయోజనాలు:** 100% సేంద్రియం, ప్రయోజనకరమైన కీటకాలకు సురక్షితం.\n\n⏰ **పిచికారీ విరామం:** నివారణకు 10-15 రోజులు; తెగులులో 7 రోజులు.',
+        },
+        'Imidacloprid 17.8% SL': {
+            'en-IN': '**Imidacloprid — Usage Guide**\n\n💧 **Dosage:** 0.5ml per litre for foliar spray; 1ml/litre for soil drench.\n\n🌱 **Best For:** Cotton (Whitefly, Jassids), Rice (BPH), Vegetables (Aphids), Chilli (Thrips)\n\n⚠️ **Safety:** Wear gloves & mask. PHI (Pre-Harvest Interval): 21 days minimum. Toxic to bees — avoid during flowering.\n\n🌿 **Organic Alternative:** Beauveria bassiana (₹250/kg) for same pests, with zero residue.\n\n⏰ **Best Timing:** Apply at early pest emergence. Do not exceed 2 sprays per season.\n\n🏷️ **Cost Tip:** Generic brands offer same AI at 30-40% less cost vs branded products.',
+            'ta-IN': '**இமிடாக்ளோபிரிட் — பயன்பாட்டு வழிகாட்டி**\n\n💧 **அளவு:** இலை தெளிப்புக்கு 0.5ml/லிட்டர்; மண் ஊறுதலுக்கு 1ml/லிட்டர்.\n\n🌱 **சிறந்தது:** பருத்தி (வெள்ளை ஈ), நெல் (BPH), காய்கறிகள் (அசுவினி)\n\n⚠️ **பாதுகாப்பு:** கையுறைகள் & முகமூடி அணியவும். அறுவடைக்கு 21 நாட்கள் முன் நிறுத்தவும்.\n\n🌿 **இயற்கை மாற்று:** பீவேரியா பாசியானா (₹250/கிலோ)',
+            'hi-IN': '**इमिडाक्लोप्रिड — उपयोग गाइड**\n\n💧 **खुराक:** पत्तियों पर 0.5ml/लीटर; मिट्टी में 1ml/लीटर।\n\n🌱 **उपयुक्त:** कपास (सफेद मक्खी), धान (BPH), सब्जियां (एफिड)\n\n⚠️ **सुरक्षा:** दस्ताने और मास्क पहनें। कटाई से 21 दिन पहले बंद करें।\n\n🌿 **जैविक विकल्प:** ब्यूवेरिया बेसियाना (₹250/किग्रा)',
+        },
+        'Mancozeb 75% WP': {
+            'en-IN': '**Mancozeb — Usage Guide**\n\n💧 **Dosage:** 2.5g per litre of water. Apply as preventive before disease onset.\n\n🌱 **Best For:** Potato (Late Blight), Tomato (Early Blight), Grape (Downy Mildew), Rice (Brown Spot), Groundnut (Tikka)\n\n✅ **Advantages:** Broad-spectrum contact fungicide. Affordable and widely available.\n\n⚠️ **Safety:** PHI: 14 days. Wear protective gear. Do not mix with alkaline materials.\n\n🌿 **Organic Alternative:** Trichoderma viride (₹180/kg) for soil application + Copper Oxychloride for foliar.\n\n⏰ **Spray Schedule:** Start at first sign of disease. Repeat every 10-12 days. Max 4 sprays/season.\n\n🏷️ **Cost Tip:** Available in 100g/250g/500g packs — 500g pack gives best value per gram.',
+            'ta-IN': '**மான்கோசெப் — பயன்பாட்டு வழிகாட்டி**\n\n💧 **அளவு:** 1 லிட்டர் நீருக்கு 2.5 கிராம். நோய் தொடங்கும் முன் தடுப்பாக தெளிக்கவும்.\n\n🌱 **சிறந்தது:** உருளை (தாமத அங்கமாரி), தக்காளி (ஆரம்ப அங்கமாரி), நிலக்கடலை\n\n⚠️ **பாதுகாப்பு:** அறுவடைக்கு 14 நாட்கள் முன் நிறுத்தவும்.\n\n🌿 **இயற்கை மாற்று:** டிரைக்கோடெர்மா விரிடி (₹180/கிலோ)',
+            'hi-IN': '**मैंकोजेब — उपयोग गाइड**\n\n💧 **खुराक:** 2.5ग्रा प्रति लीटर पानी। रोग शुरू होने से पहले रोकथाम के रूप में लगाएं।\n\n🌱 **उपयुक्त:** आलू (झुलसा), टमाटर (अगेती अंगमारी), मूंगफली\n\n⚠️ **सुरक्षा:** कटाई से 14 दिन पहले बंद करें।\n\n🌿 **जैविक विकल्प:** ट्राइकोडर्मा विरिडी (₹180/किग्रा)',
+        },
+        'Emamectin Benzoate 5% SG': {
+            'en-IN': '**Emamectin Benzoate — Usage Guide**\n\n💧 **Dosage:** 0.4g per litre of water (4g per 10L knapsack sprayer).\n\n🌱 **Best For:** Maize (Fall Armyworm), Cotton (Bollworm), Chilli (Fruit Borer), Tomato (Fruit Borer), Cabbage (Diamond Back Moth)\n\n✅ **Advantages:** Highly effective against lepidopteran pests. Translaminar action — reaches pests on underside of leaves.\n\n⚠️ **Safety:** PHI: 7 days. Highly toxic to fish — do not spray near water bodies. Wear full PPE.\n\n🌿 **Organic Alternative:** Bt (Bacillus thuringiensis) spray for caterpillar control; Trichogramma egg parasitoid cards.\n\n⏰ **Best Timing:** Apply at early larval stage (1st-2nd instar). Evening spray gives best results.\n\n🏷️ **Cost Tip:** Available in 10g/50g/100g sachets. 100g sachet (₹620) is most economical.',
+            'ta-IN': '**எமாமெக்டின் பென்சோயேட் — பயன்பாட்டு வழிகாட்டி**\n\n💧 **அளவு:** 1 லிட்டர் நீருக்கு 0.4 கிராம்.\n\n🌱 **சிறந்தது:** மக்காச்சோளம் (படை புழு), பருத்தி (காய்ப்புழு), மிளகாய் (காய்ப்புழு)\n\n⚠️ **பாதுகாப்பு:** அறுவடைக்கு 7 நாட்கள் முன் நிறுத்தவும். மீன்களுக்கு மிகவும் நச்சு.\n\n🌿 **இயற்கை மாற்று:** Bt (பேசில்லஸ் துரிஞ்சியென்சிஸ்) தெளிப்பு',
+            'hi-IN': '**इमामेक्टिन बेंजोएट — उपयोग गाइड**\n\n💧 **खुराक:** 0.4ग्रा प्रति लीटर पानी।\n\n🌱 **उपयुक्त:** मक्का (फॉल आर्मीवर्म), कपास (बॉलवर्म), मिर्च (फल बेधक)\n\n⚠️ **सुरक्षा:** कटाई से 7 दिन पहले बंद करें। मछलियों के लिए अत्यधिक विषैला।\n\n🌿 **जैविक विकल्प:** Bt (बैसिलस थुरिंजिएंसिस) छिड़काव',
+        },
+    };
+
+    // Build default advice based on category
+    const buildDefault = (name, cat, use) => {
+        const safetyNote = isBio
+            ? 'This is an organic/biological product — safe for beneficial insects and the environment. No pre-harvest interval required.'
+            : 'Always wear gloves, mask, and protective clothing during application. Follow the recommended pre-harvest interval (PHI) strictly.';
+
+        const organic = isBio ? '' : '\n\n🌿 **Organic Alternative:** Consider bio-pesticides like Neem Oil, Trichoderma viride, or Beauveria bassiana for eco-friendly pest management.';
+
+        const defaults = {
+            'en-IN': `**${name} — AI Usage Guide**\n\n🎯 **Target:** ${use}\n📂 **Category:** ${cat}\n\n⚠️ **Safety:** ${safetyNote}${organic}\n\n💡 **General Tips:**\n- Always read the product label for exact dosage\n- Spray during cool hours (early morning/evening)\n- Do not spray during rain or wind\n- Rotate with different mode-of-action products to prevent resistance\n- Dispose of empty containers safely\n\n📞 **Helpline:** Kisan Call Centre 1800-180-1551 (toll-free)`,
+            'ta-IN': `**${name} — AI பயன்பாட்டு வழிகாட்டி**\n\n🎯 **இலக்கு:** ${use}\n📂 **வகை:** ${cat}\n\n⚠️ **பாதுகாப்பு:** ${isBio ? 'இது இயற்கை தயாரிப்பு — நன்மை செய்யும் பூச்சிகளுக்கு பாதுகாப்பானது.' : 'கையுறைகள், முகமூடி மற்றும் பாதுகாப்பு ஆடை அணியவும்.'}${isBio ? '' : '\n\n🌿 **இயற்கை மாற்று:** வேப்பெண்ணெய், டிரைக்கோடெர்மா போன்ற உயிர் பூச்சிக்கொல்லிகளை பரிசீலிக்கவும்.'}\n\n📞 **உதவி:** கிசான் கால் சென்டர் 1800-180-1551`,
+            'hi-IN': `**${name} — AI उपयोग गाइड**\n\n🎯 **लक्ष्य:** ${use}\n📂 **श्रेणी:** ${cat}\n\n⚠️ **सुरक्षा:** ${isBio ? 'यह जैविक उत्पाद है — लाभकारी कीटों के लिए सुरक्षित।' : 'दस्ताने, मास्क और सुरक्षात्मक कपड़े पहनें।'}${isBio ? '' : '\n\n🌿 **जैविक विकल्प:** नीम तेल, ट्राइकोडर्मा जैसे जैव-कीटनाशकों पर विचार करें।'}\n\n📞 **सहायता:** किसान कॉल सेंटर 1800-180-1551`,
+            'kn-IN': `**${name} — AI ಬಳಕೆ ಮಾರ್ಗದರ್ಶಿ**\n\n🎯 **ಗುರಿ:** ${use}\n📂 **ವರ್ಗ:** ${cat}\n\n⚠️ **ಸುರಕ್ಷತೆ:** ${isBio ? 'ಇದು ಸಾವಯವ ಉತ್ಪನ್ನ — ಉಪಯುಕ್ತ ಕೀಟಗಳಿಗೆ ಸುರಕ್ಷಿತ.' : 'ಕೈಗವಸುಗಳು, ಮುಖಗವಸು ಮತ್ತು ರಕ್ಷಣಾ ಉಡುಪು ಧರಿಸಿ.'}\n\n📞 **ಸಹಾಯ:** ಕಿಸಾನ್ ಕಾಲ್ ಸೆಂಟರ್ 1800-180-1551`,
+            'te-IN': `**${name} — AI వాడకం గైడ్**\n\n🎯 **లక్ష్యం:** ${use}\n📂 **వర్గం:** ${cat}\n\n⚠️ **భద్రత:** ${isBio ? 'ఇది సేంద్రియ ఉత్పత్తి — ప్రయోజనకరమైన కీటకాలకు సురక్షితం.' : 'చేతి తొడుగులు, ముఖ కవచం మరియు రక్షణ దుస్తులు ధరించండి.'}\n\n📞 **సహాయం:** కిసాన్ కాల్ సెంటర్ 1800-180-1551`,
+        };
+        return defaults[lang] || defaults['en-IN'];
+    };
+
+    const specific = PEST_ADVISORIES[productName];
+    const advisory = (specific && specific[lang]) || (specific && specific['en-IN']) || buildDefault(productName, category, usage);
+
+    return {
+        status: 'success',
+        data: {
+            advisory,
+            source: 'AI Knowledge Base (Mock)',
+            lastUpdated: new Date().toISOString().split('T')[0],
+        }
+    };
+}

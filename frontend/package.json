@@ -1,0 +1,28 @@
+{
+  "name": "smart-rural-ai-advisor",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Smart Rural AI Advisor — AI-powered agricultural assistant for Indian farmers",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "amazon-cognito-identity-js": "^6.3.16",
+    "dompurify": "^3.3.1",
+    "leaflet": "^1.9.4",
+    "marked": "^17.0.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
+    "react-router-dom": "^6.26.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.0"
+  }
+}

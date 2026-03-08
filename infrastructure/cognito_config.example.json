@@ -1,0 +1,8 @@
+{
+  "region": "ap-south-1",
+  "userPoolId": "YOUR_COGNITO_USER_POOL_ID",
+  "userPoolClientId": "YOUR_COGNITO_CLIENT_ID",
+  "domain": "YOUR_COGNITO_DOMAIN",
+  "authorizerId": "YOUR_API_AUTHORIZER_ID",
+  "apiGatewayId": "YOUR_API_GATEWAY_ID"
+}

@@ -1,0 +1,515 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Smart Rural AI Advisor - Serverless Backend
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: python3.13
+    Environment:
+      Variables:
+        BEDROCK_KB_ID: !Ref BedrockKBId
+        OPENWEATHER_API_KEY: !Ref OpenWeatherApiKey
+        OPENWEATHER_API_KEY_SECRET_ARN: !Ref OpenWeatherApiKeySecretArn
+        S3_KNOWLEDGE_BUCKET: !Sub 'smart-rural-ai-${AWS::AccountId}'
+        DYNAMODB_PROFILES_TABLE: farmer_profiles
+        DYNAMODB_SESSIONS_TABLE: chat_sessions
+        ENFORCE_CODE_POLICY: !Ref EnforceCodePolicy
+        # Enterprise Guardrails
+        BEDROCK_GUARDRAIL_ID: !Ref BedrockGuardrailId
+        BEDROCK_GUARDRAIL_VERSION: !Ref BedrockGuardrailVersion
+        ENABLE_RATE_LIMITING: 'true'
+        ENABLE_RATE_LIMIT_TTL: !Ref EnableRateLimitTTL
+        DYNAMODB_RATE_LIMIT_TABLE: rate_limits
+        # Rate-limit thresholds (safe defaults)
+        RATE_LIMIT_RPM: '15'
+        RATE_LIMIT_RPH: '120'
+        RATE_LIMIT_DAILY: '500'
+        # Chat session TTL in days
+        CHAT_TTL_DAYS: '30'
+        # TTS / Polly configuration
+        POLLY_FORCE_HINDI_FALLBACK: 'false'
+        TTS_FAILOVER_TO_POLLY: 'true'
+        USE_GTTS: 'true'
+        ALLOWED_ORIGIN: 'https://d80ytlzsrax1n.cloudfront.net'
+        ENABLE_TRANSLATION_CHUNKING: 'true'
+        TRANSLATE_MAX_BYTES: '9000'
+        ENABLE_GTTS_EXPONENTIAL_BACKOFF: 'true'
+        ENABLE_CHAT_PAGINATION: 'true'
+        ENABLE_EXTENDED_AUDIO_EXPIRY: 'true'
+        ENABLE_REGEX_DOS_PROTECTION: 'true'
+        REGEX_INPUT_MAX_LENGTH: '2000'
+        ENABLE_SMART_TRUNCATION: 'true'
+        ENABLE_CONNECTION_POOLING: 'true'
+        ENABLE_BATCH_CHAT_WRITES: 'true'
+        ENABLE_BACKOFF_JITTER: 'true'
+        ENABLE_PROFILE_CACHE: 'true'
+        PROFILE_CACHE_TTL_SEC: '120'
+        ENABLE_LANGUAGE_VALIDATION_LOGGING: 'true'
+        ENABLE_CHAT_IDEMPOTENCY: 'true'
+        ENABLE_VOICE_VALIDATION: 'true'
+        ENABLE_S3_VALIDATION: 'true'
+        ENABLE_TTS_LIST_FORMATTING: 'true'
+        ENABLE_HTTPS_WEATHER_API: 'true'
+        ENABLE_UNIFIED_CORS: 'true'
+
+Parameters:
+  BedrockKBId:
+    Type: String
+    Description: Bedrock Knowledge Base ID (required for KB-backed crop advisory)
+    Default: ''
+  OpenWeatherApiKey:
+    Type: String
+    Description: OpenWeatherMap API Key
+    Default: ''
+    NoEcho: true
+  OpenWeatherApiKeySecretArn:
+    Type: String
+    Description: Optional AWS Secrets Manager secret ARN containing OpenWeather API key (preferred)
+    Default: ''
+  EnforceCodePolicy:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Description: Enforce application-level policy checks (topic gating, grounding, sources)
+    Default: 'true'
+  BedrockGuardrailId:
+    Type: String
+    Description: Bedrock Guardrail ID (optional, leave blank to disable)
+    Default: ''
+  BedrockGuardrailVersion:
+    Type: String
+    Description: Bedrock Guardrail version (optional)
+    Default: ''
+  CognitoUserPoolId:
+    Type: String
+    Description: Cognito User Pool ID for authentication
+    Default: ''
+  EnableRateLimitTTL:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Description: Enable DynamoDB TTL on existing rate_limits table (attribute ttl_epoch)
+    Default: 'true'
+
+Conditions:
+  HasOpenWeatherSecretArn: !Not [!Equals [!Ref OpenWeatherApiKeySecretArn, '']]
+
+Resources:
+  # S3 Bucket and DynamoDB tables created manually (already exist)
+  # DynamoDB: farmer_profiles, chat_sessions, otp_codes, rate_limits
+
+  # Lambda Functions
+  AgentOrchestratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/lambdas/agent_orchestrator/
+      Handler: handler.lambda_handler
+      Environment:
+        Variables:
+          FOUNDATION_MODEL: apac.amazon.nova-pro-v1:0
+          FOUNDATION_MODEL_LITE: 'global.amazon.nova-2-lite-v1:0'
+          LAMBDA_WEATHER: !Ref WeatherFunction
+          LAMBDA_CROP: !Ref CropAdvisoryFunction
+          LAMBDA_SCHEMES: !Ref GovtSchemesFunction
+          LAMBDA_PROFILE: !Ref FarmerProfileFunction
+          ENABLE_TIMEOUT_PROTECTION: 'true'
+          TIMEOUT_BUFFER_MS: '5000'
+          ENABLE_TOOL_TIMEOUT: 'true'
+          TOOL_EXECUTION_TIMEOUT_SEC: '25'
+          ENABLE_THREAD_SAFE_TOOLS: 'true'
+          ENABLE_MODEL_FALLBACK: 'true'
+          ENABLE_MODEL_VALIDATION: 'true'
+          ENABLE_TOOL_INVOCATION_TIMEOUT: 'true'
+          ENABLE_TOOL_METRICS: 'true'
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:Converse
+                - bedrock:ConverseStream
+                - bedrock:ApplyGuardrail
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:smart-rural-ai-*'
+            - Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - translate:TranslateText
+                - comprehend:DetectDominantLanguage
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - polly:SynthesizeSpeech
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+              Resource: !Sub 'arn:aws:s3:::smart-rural-ai-${AWS::AccountId}/*'
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/chat_sessions'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/farmer_profiles'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/rate_limits'
+      Events:
+        ChatApi:
+          Type: Api
+          Properties:
+            Path: /chat
+            Method: post
+        ChatOptions:
+          Type: Api
+          Properties:
+            Path: /chat
+            Method: options
+        VoiceApi:
+          Type: Api
+          Properties:
+            Path: /voice
+            Method: post
+        VoiceOptions:
+          Type: Api
+          Properties:
+            Path: /voice
+            Method: options
+
+  CropAdvisoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/lambdas/crop_advisory/
+      Handler: handler.lambda_handler
+      Environment:
+        Variables:
+          ENABLE_KB_RETRY: 'true'
+          KB_RETRY_MAX_ATTEMPTS: '3'
+          KB_RETRY_BASE_DELAY: '1.0'
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:RetrieveAndGenerate
+                - bedrock:Retrieve
+              Resource: '*'
+
+  WeatherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/lambdas/weather_lookup/
+      Handler: handler.lambda_handler
+      Environment:
+        Variables:
+          ENABLE_COORDINATE_VALIDATION: 'true'
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: '*'
+      Events:
+        WeatherApi:
+          Type: Api
+          Properties:
+            Path: /weather/{location}
+            Method: get
+        WeatherOptions:
+          Type: Api
+          Properties:
+            Path: /weather/{location}
+            Method: options
+
+  HealthCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      InlineCode: |
+        import os
+        def lambda_handler(event, context):
+            origin = os.environ.get('ALLOWED_ORIGIN', 'https://d80ytlzsrax1n.cloudfront.net')
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': origin},
+                'body': '{"status": "healthy", "service": "Smart Rural AI Advisor"}'
+            }
+      Handler: index.lambda_handler
+      Events:
+        HealthApi:
+          Type: Api
+          Properties:
+            Path: /health
+            Method: get
+
+  ImageAnalysisFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/lambdas/image_analysis/
+      Handler: handler.lambda_handler
+      Timeout: 60
+      MemorySize: 512
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - translate:TranslateText
+              Resource: '*'
+      Events:
+        ImageApi:
+          Type: Api
+          Properties:
+            Path: /image-analyze
+            Method: post
+        ImageOptions:
+          Type: Api
+          Properties:
+            Path: /image-analyze
+            Method: options
+
+  GovtSchemesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/lambdas/govt_schemes/
+      Handler: handler.lambda_handler
+      # No IAM policies needed — uses hardcoded scheme data, no AWS service calls
+      Events:
+        SchemesApi:
+          Type: Api
+          Properties:
+            Path: /schemes
+            Method: get
+        SchemesOptions:
+          Type: Api
+          Properties:
+            Path: /schemes
+            Method: options
+
+  FarmerProfileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/lambdas/farmer_profile/
+      Handler: handler.lambda_handler
+      Environment:
+        Variables:
+          DYNAMODB_OTP_TABLE: otp_codes
+          DYNAMODB_PROFILES_TABLE: farmer_profiles
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+          STAGE: prod
+          ENABLE_DEMO_OTP: 'true'
+          ENABLE_FARMER_ID_VALIDATION: 'true'
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/farmer_profiles'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/otp_codes'
+            - Effect: Allow
+              Action:
+                - cloudwatch:GetMetricStatistics
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminDeleteUser
+                - cognito-idp:AdminSetUserPassword
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*'
+      Events:
+        ProfileGetApi:
+          Type: Api
+          Properties:
+            Path: /profile/{farmerId}
+            Method: get
+        ProfilePutApi:
+          Type: Api
+          Properties:
+            Path: /profile/{farmerId}
+            Method: put
+        ProfileDeleteApi:
+          Type: Api
+          Properties:
+            Path: /profile/{farmerId}
+            Method: delete
+        ProfileOptions:
+          Type: Api
+          Properties:
+            Path: /profile/{farmerId}
+            Method: options
+        OtpSendApi:
+          Type: Api
+          Properties:
+            Path: /otp/send
+            Method: post
+        OtpVerifyApi:
+          Type: Api
+          Properties:
+            Path: /otp/verify
+            Method: post
+        OtpOptions:
+          Type: Api
+          Properties:
+            Path: /otp/send
+            Method: options
+        OtpVerifyOptions:
+          Type: Api
+          Properties:
+            Path: /otp/verify
+            Method: options
+        PinResetApi:
+          Type: Api
+          Properties:
+            Path: /pin/reset
+            Method: post
+        PinResetOptions:
+          Type: Api
+          Properties:
+            Path: /pin/reset
+            Method: options
+
+  TranscribeSpeechFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/lambdas/transcribe_speech/
+      Handler: handler.lambda_handler
+      Timeout: 60
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - transcribe:StartTranscriptionJob
+                - transcribe:GetTranscriptionJob
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource: !Sub 'arn:aws:s3:::smart-rural-ai-${AWS::AccountId}/*'
+      Events:
+        TranscribeApi:
+          Type: Api
+          Properties:
+            Path: /transcribe
+            Method: post
+        TranscribeOptions:
+          Type: Api
+          Properties:
+            Path: /transcribe
+            Method: options
+
+  RateLimitTTLConfiguratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: RateLimitTTLConfiguratorPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateTimeToLive
+                  - dynamodb:DescribeTimeToLive
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/rate_limits'
+
+  RateLimitTTLConfiguratorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.13
+      Handler: index.handler
+      Timeout: 60
+      Role: !GetAtt RateLimitTTLConfiguratorRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import urllib.request
+
+          ddb = boto3.client('dynamodb')
+
+          def _send(event, context, status, data=None, reason=None):
+              body = {
+                  'Status': status,
+                  'Reason': reason or f'See CloudWatch Logs: {context.log_stream_name}',
+                  'PhysicalResourceId': f"RateLimitTTL-{event.get('ResourceProperties', {}).get('TableName', 'rate_limits')}",
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'Data': data or {},
+              }
+              encoded = json.dumps(body).encode('utf-8')
+              req = urllib.request.Request(
+                  event['ResponseURL'],
+                  data=encoded,
+                  method='PUT',
+                  headers={'content-type': '', 'content-length': str(len(encoded))},
+              )
+              with urllib.request.urlopen(req):
+                  return
+
+          def handler(event, context):
+              try:
+                  request_type = event.get('RequestType')
+                  if request_type == 'Delete':
+                      _send(event, context, 'SUCCESS', {'message': 'No action on delete'})
+                      return
+
+                  props = event.get('ResourceProperties', {})
+                  table_name = props.get('TableName', 'rate_limits')
+                  enable_ttl = str(props.get('EnableTTL', 'false')).lower() == 'true'
+
+                  ddb.update_time_to_live(
+                      TableName=table_name,
+                      TimeToLiveSpecification={
+                          'AttributeName': 'ttl_epoch',
+                          'Enabled': enable_ttl,
+                      },
+                  )
+
+                  _send(event, context, 'SUCCESS', {
+                      'table': table_name,
+                      'ttl_enabled': str(enable_ttl).lower(),
+                  })
+              except Exception as exc:
+                  _send(event, context, 'FAILED', reason=str(exc))
+
+  RateLimitTTLConfigurator:
+    Type: Custom::RateLimitTTLConfigurator
+    Properties:
+      ServiceToken: !GetAtt RateLimitTTLConfiguratorFunction.Arn
+      TableName: rate_limits
+      EnableTTL: !Ref EnableRateLimitTTL
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/'

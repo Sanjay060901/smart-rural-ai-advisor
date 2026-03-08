@@ -1,0 +1,14 @@
+version = 0.1
+
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "smart-rural-ai"
+s3_bucket = "CHANGE_ME_S3_BUCKET"
+s3_prefix = "sam-deployments"
+region = "ap-south-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "BedrockKBId="
+]
+confirm_changeset = false

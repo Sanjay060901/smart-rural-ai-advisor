@@ -1,0 +1,3 @@
+# boto3 is pre-installed in Lambda runtime
+# gTTS: free Google Translate TTS for Indian languages (no API key needed)
+gTTS>=2.5.0

@@ -1,0 +1,31 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.13
+    commands:
+      - echo "Installing SAM CLI..."
+      - pip install --quiet aws-sam-cli
+      - sam --version
+
+  build:
+    commands:
+      - echo "Building SAM application..."
+      - sam build --template-file infrastructure/template.yaml
+
+  post_build:
+    commands:
+      - echo "Deploying SAM application..."
+      - sam deploy --config-file infrastructure/samconfig.toml --config-env default --no-confirm-changeset --no-fail-on-empty-changeset
+      - echo "Deployment complete!"
+      - |
+        API_URL=$(aws cloudformation describe-stacks \
+          --stack-name smart-rural-ai \
+          --region ap-south-1 \
+          --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+          --output text)
+        echo "API URL: $API_URL"
+      - echo "Testing health endpoint..."
+      - |
+        curl -s "${API_URL}health" || echo "Health check skipped"

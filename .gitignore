@@ -1,0 +1,72 @@
+# Smart Rural AI Advisor - .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.venv*/
+*.egg-info/
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+build/
+*.tsbuildinfo
+
+# Environment / Secrets
+.env
+.env.local
+.env.*.local
+frontend/.env
+*.pem
+*.key
+
+# AWS / SAM
+.aws/
+.aws-sam/
+infrastructure/packaged.yaml
+infrastructure/packaged-template.yaml
+infrastructure/packaged-live.yaml
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs / Archives / Temp
+*.log
+*.tmp
+*.temp
+*.zip
+*.tar.gz
+temp/
+.tools/
+
+# Local archival workspace (not for GitHub submission)
+archive/
+
+# Local scratch scripts and ad-hoc outputs
+_*.py
+_*.json
+_*.txt
+payload_*.json
+resp_*.json
+*_out.json
+*_out.txt
+verify_*.txt
